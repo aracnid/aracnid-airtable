@@ -3,19 +3,25 @@
 import os
 from typing import Any, Dict, List, Optional
 
-from aracnid_core.base import BaseConnector
-from pyairtable import Api, Table
+from aracnid_core.base_connector import BaseConnector
+from pyairtable import Api
+
+from schema.model import AirtableRecordBase, create_model_from_dict
+from schema.transform import from_airtable
 
 
 class AirtableConnector(BaseConnector):
     """Airtable connector for Aracnid integration framework.
     """
-    def __init__(self, base_id: str, table_name: str):
+    def __init__(self, base_id: str, table_name: str, schema: Optional[Dict] = None):
         """Initialize the Airtable connector.
         Args:
             base_id (str): The Airtable base ID.
             table_name (str): The Airtable table name.
-            api_key (str): The Airtable API key.
+            schema (Optional[Dict]): The schema for the Airtable table.
+                If not provided, the schema will be self-discovered.
+        Raises:
+            ValueError: If the base ID or table name is not found.
 
         Environment Variables:
             AIRTABLE_API_KEY: The Airtable API key.
@@ -41,72 +47,72 @@ class AirtableConnector(BaseConnector):
 
         # set the table
         self.table_name = table_name
-        self.table = Table(self.air_api_key, self.base_id, table_name)
+        self.table = self.api.table(self.base_id, table_name)
         if not self.table:
-            raise ValueError(f'Table with name {self.table_name} not found in base {self.base_id}.')
+            raise ValueError(
+                f'Table with name {self.table_name} not found in base {self.base_id}.'
+            )
+        
+        # set the schema
+        self.schema = schema or self._discover_schema()
+        self.model = create_model_from_dict(self.schema)
 
-    def create(self, record: Dict) -> Dict:
-        response = requests.post(self.api_url, json={'fields': record}, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+
+    def _discover_schema(self) -> Dict:
+        # Future enhancement: introspect fields from Airtable
+        raise NotImplementedError('Schema must be provided for now.')
+    
+
+    def create(self, fields: Dict) -> AirtableRecordBase:
+        """Create a record with the given fields in the Airtable table.
+
+        Args:
+            fields (Dict): The fields to create in the record.
+
+        Returns:
+            AirtableRecordBase: The created record.
+        """
+        # validate fields against the model
+        validated_record = self.model(**fields)
+
+        # convert the validated record to a dictionary excluding certain fields
+        validated_dict = validated_record.model_dump(
+            exclude={'id', 'metadata', 'source'}
+        )
+
+        # create the record in Airtable
+        created_dict = self.table.create(validated_dict)
+
+        # convert the created Airtable record to the standard model
+        created_record = from_airtable(self.model, created_dict)
+
+        # return the created record
+        return created_record
+
 
     def read_one(self, record_id: str) -> Optional[Dict]:
-        url = f'{self.api_url}/{record_id}'
-        response = requests.get(url, headers=self.headers)
-        if response.status_code == 404:
-            return None
-        response.raise_for_status()
-        return response.json()
+        pass
+
 
     def read_many(self, filters: Optional[Dict] = None) -> List[Dict]:
-        records = []
-        offset = None
-        while True:
-            params = {}
-            if offset:
-                params['offset'] = offset
-            if filters:
-                formula = ' AND '.join([f'{{{k}}}="{v}"' for k, v in filters.items()])
-                params['filterByFormula'] = formula
-            response = requests.get(self.api_url, headers=self.headers, params=params)
-            response.raise_for_status()
-            data = response.json()
-            records.extend(data.get('records', []))
-            offset = data.get('offset')
-            if not offset:
-                break
-        return records
+        return []
+
 
     def update(self, record_id: str, changes: Dict) -> Dict:
-        url = f'{self.api_url}/{record_id}'
-        response = requests.patch(url, json={'fields': changes}, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        return {}
+
 
     def replace(self, record_id: str, new_record: Dict) -> Dict:
-        url = f'{self.api_url}/{record_id}'
-        response = requests.put(url, json={'fields': new_record}, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        return {}
+
 
     def delete_one(self, record_id: str, hard: bool = False) -> bool:
-        if not hard:
-            return bool(self.update(record_id, {'is_deleted': True}))
-        url = f'{self.api_url}/{record_id}'
-        response = requests.delete(url, headers=self.headers)
-        if response.status_code == 200:
-            return True
-        response.raise_for_status()
         return False
 
+
     def delete_many(self, filters: Optional[Dict] = None, hard: bool = False) -> int:
-        records = self.read_many(filters)
-        count = 0
-        for record in records:
-            record_id = record.get('id')
-            if record_id and self.delete_one(record_id, hard=hard):
-                count += 1
-        return count
+        return 0
+
 
     def get_source_name(self) -> str:
         if not self.base:
