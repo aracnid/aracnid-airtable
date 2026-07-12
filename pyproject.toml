@@ -17,7 +17,33 @@ pytz = "^2025.2"
 [tool.poetry.group.dev.dependencies]
 aracnid-core = { path = "../aracnid-core", develop = true }
 pytest = "^8.3.5"
+ruff = "^0.15.21"
+build = "^1.5.1"
+twine = "^6.2.0"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+addopts = "-p no:warnings"
+env_files = [".env"]
+log_cli = true
+log_cli_level = "DEBUG"
+
+[tool.ruff]
+# Target your current version
+target-version = "py310"
+line-length = 88 
+
+[tool.ruff.lint]
+# E = pycodestyle (Errors), F = Pyflakes (Logic Bugs)
+# These are the "Pylint-like" essentials without the fluff.
+select = ["E", "F", "B"] 
+
+# Specifically ignore the stuff that usually annoys Pylint users
+ignore = [
+    "E501", # Ignore line length (let the formatter handle it)
+    #"D",    # Ignore all Docstring requirements
+    "ANN",  # Ignore missing type annotations (if you aren't ready for strict typing)
+]
