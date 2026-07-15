@@ -58,11 +58,11 @@ class AirtableConnector(BaseConnector):
         self.table = self.api.table(self.base_id, self.table_name)
 
 
-    def _normalize_record(self, rec: RecordDict) -> dict[str, Any]:
+    def _normalize_record(self, rec: RecordDict | dict[str, Any]) -> dict[str, Any]:
         """Normalize an Airtable record into a dictionary with standard keys.
 
         Args:
-            rec (RecordDict): The Airtable record to normalize.
+            rec (RecordDict | dict[str, Any]): The Airtable record to normalize.
 
         Returns:
             dict[str, Any]: The normalized record.

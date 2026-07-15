@@ -12,7 +12,6 @@ keywords = ["connector"]
 python = "^3.10"
 aracnid-core = "1.0.0"
 pyairtable = "^3.1.1"
-pytz = "^2025.2"
 
 [tool.poetry.group.dev.dependencies]
 aracnid-core = { path = "../aracnid-core", develop = true }
@@ -31,7 +30,8 @@ env_files = [".env"]
 log_cli = true
 log_cli_level = "DEBUG"
 markers = [
-  "contract: shared BaseConnector contract/conformance tests"
+  "contract: shared BaseConnector contract/conformance tests",
+  "integration: tests that call external services"
 ]
 
 [tool.ruff]
