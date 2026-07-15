@@ -5,7 +5,7 @@ import os
 import pytest
 
 from aracnid_core.contract_tests import base_connector_contract as contract_tests
-from i_airtable.connector import AirtableConnector
+from aracnid_airtable.connector import AirtableConnector
 
 
 @pytest.fixture

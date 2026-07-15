@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "i-airtable"
-version = "0.3.0"
+name = "aracnid-airtable"
+version = "1.0.0"
 description = "Airtable connector for the Aracnid integration framework"
 authors = ["Jason Romano <aracnid@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/aracnid/i-airtable"
+repository = "https://github.com/aracnid/aracnid-airtable"
 keywords = ["connector"]
 
 [tool.poetry.dependencies]

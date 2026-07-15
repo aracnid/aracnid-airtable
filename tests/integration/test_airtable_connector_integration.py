@@ -13,7 +13,7 @@ import uuid
 
 import pytest
 
-from i_airtable.connector import AirtableConnector
+from aracnid_airtable.connector import AirtableConnector
 
 
 pytestmark = [pytest.mark.integration]

@@ -6,13 +6,13 @@ from unittest.mock import MagicMock, patch
 from pyairtable.formulas import match
 import pytest
 
-from i_airtable.connector import AirtableConnector
+from aracnid_airtable.connector import AirtableConnector
 
 
 @pytest.fixture
 def connector_and_table() -> tuple[AirtableConnector, MagicMock]:
-    with patch("i_airtable.connector.os.getenv", return_value="key_test"), patch(
-        "i_airtable.connector.Api"
+    with patch("aracnid_airtable.connector.os.getenv", return_value="key_test"), patch(
+        "aracnid_airtable.connector.Api"
     ) as mock_api_cls:
         mock_api = MagicMock()
         mock_table = MagicMock()

@@ -1,23 +1,23 @@
-# i-airtable
+# aracnid-airtable
 
 A Python Airtable connector implementation for the `aracnid-base` contract.
 
 ## Overview
 
-`i-airtable` provides an `AirtableConnector` implementation that follows the shared connector interface used across `i-*` connector modules. It wraps Airtable CRUD operations with consistent validation, normalization, and error handling semantics.
+`aracnid-airtable` provides an `AirtableConnector` implementation that follows the shared connector interface used across `i-*` connector modules. It wraps Airtable CRUD operations with consistent validation, normalization, and error handling semantics.
 
 ## Installation
 
 Using Poetry:
 
 ```bash
-poetry add i-airtable
+poetry add aracnid-airtable
 ```
 
 Using pip:
 
 ```bash
-pip install i-airtable
+pip install aracnid-airtable
 ```
 
 ## Requirements
@@ -36,7 +36,7 @@ export AIRTABLE_API_KEY=your_api_key
 ## Quick Start
 
 ```python
-from i_airtable.connector import AirtableConnector
+from aracnid_airtable.connector import AirtableConnector
 
 connector = AirtableConnector(
     base_id="appXXXXXXXXXXXXXX",
