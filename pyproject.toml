@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "aracnid-airtable"
-version = "1.0.0"
+version = "1.0.2"
 description = "Airtable connector for the Aracnid integration framework"
 authors = ["Jason Romano <aracnid@gmail.com>"]
 license = "MIT"

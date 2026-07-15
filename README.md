@@ -4,7 +4,7 @@ A Python Airtable connector implementation for the `aracnid-base` contract.
 
 ## Overview
 
-`aracnid-airtable` provides an `AirtableConnector` implementation that follows the shared connector interface used across `i-*` connector modules. It wraps Airtable CRUD operations with consistent validation, normalization, and error handling semantics.
+`aracnid-airtable` provides an `AirtableConnector` implementation that follows the shared connector interface used across `aracnid-*` connector modules. It wraps Airtable CRUD operations with consistent validation, normalization, and error handling semantics.
 
 ## Installation
 
