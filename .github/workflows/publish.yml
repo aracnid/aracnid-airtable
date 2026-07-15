@@ -64,7 +64,7 @@ jobs:
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/p/aracnid-config
+      url: https://pypi.org/p/aracnid-airtable
 
     steps:
       - name: Download all the dists
