@@ -1,7 +1,7 @@
-"""Test modules for the i-airtable package.
+"""Test create functionality for the i-airtable package.
 """
 # pyright: reportAttributeAccessIssue=false
-from aracnid_core.base_connector import BaseConnector
+from aracnid_core.base import BaseConnector
 
 
 def test_create_record(connector: BaseConnector):

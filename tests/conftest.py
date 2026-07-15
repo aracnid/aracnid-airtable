@@ -14,8 +14,33 @@ def connector() -> AirtableConnector:
         AirtableConnector: The Airtable connector.
     """
     # get the environment variable for the base ID and table name
-    base_id = os.getenv('AIRTABLE_TEST_BASE_ID', '')
+    base_id = os.getenv('AIRTABLE_BASE_ID', '')
     table_name = 'test_table'
+
+    # set the schema for the test table
+    schema = {
+        'Name': (str, ...),
+        'Notes': (str, None)
+    }
+
+    # return the Airtable connector
+    return AirtableConnector(
+        base_id=base_id,
+        table_name=table_name,
+        schema=schema
+    )
+
+
+@pytest.fixture
+def connector_soft() -> AirtableConnector:
+    """Fixture for Airtable connector where soft delete is supported.
+
+    Returns:
+        AirtableConnector: The Airtable connector.
+    """
+    # get the environment variable for the base ID and table name
+    base_id = os.getenv('AIRTABLE_BASE_ID', '')
+    table_name = 'test_table_soft_delete'
 
     # set the schema for the test table
     schema = {
