@@ -1,20 +1,23 @@
-[tool.poetry]
+[project]
 name = "aracnid-airtable"
-version = "1.0.2"
+version = "1.0.3"
 description = "Airtable connector for the Aracnid integration framework"
-authors = ["Jason Romano <aracnid@gmail.com>"]
-license = "MIT"
 readme = "README.md"
-repository = "https://github.com/aracnid/aracnid-airtable"
-keywords = ["connector"]
+requires-python = ">=3.12,<4.0"
+license = "MIT"
+authors = [{ name = "Jason Romano", email = "aracnid@gmail.com" }]
+keywords = ["airtable", "aracnid", "connector"]
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/<owner>/aracnid-airtable"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.12"
 aracnid-core = "1.0.0"
 pyairtable = "^3.1.1"
 
 [tool.poetry.group.dev.dependencies]
-aracnid-core = { path = "../aracnid-core", develop = true }
 pytest = "^8.3.5"
 ruff = "^0.15.21"
 build = "^1.5.1"
@@ -22,7 +25,7 @@ twine = "^6.2.0"
 pyright = "^1.1.411"
 
 [build-system]
-requires = ["poetry-core"]
+requires = ["poetry-core>=1.8.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
@@ -36,18 +39,12 @@ markers = [
 ]
 
 [tool.ruff]
-# Target your current version
-target-version = "py310"
-line-length = 88 
+target-version = "py312"
+line-length = 88
 
 [tool.ruff.lint]
-# E = pycodestyle (Errors), F = Pyflakes (Logic Bugs)
-# These are the "Pylint-like" essentials without the fluff.
-select = ["E", "F", "B"] 
-
-# Specifically ignore the stuff that usually annoys Pylint users
+select = ["E", "F", "B"]
 ignore = [
-    "E501", # Ignore line length (let the formatter handle it)
-    #"D",    # Ignore all Docstring requirements
-    "ANN",  # Ignore missing type annotations (if you aren't ready for strict typing)
+    "E501",
+    "ANN",
 ]
