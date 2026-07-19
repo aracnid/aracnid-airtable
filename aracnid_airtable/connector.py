@@ -1,14 +1,21 @@
 """A connector for Airtable using the pyairtable library.
 """
 
+from datetime import date, datetime, timezone
 import os
 from typing import Any
 
-from pyairtable import Api
-from pyairtable.formulas import match
-from pyairtable.api.types import RecordDict
 
+from pyairtable import Api
+from pyairtable.api.types import RecordDict
+from pyairtable.formulas import AND, OR, NOT
+from pyairtable.formulas import BLANK, TRUE, FALSE
+from pyairtable.formulas import DATETIME_PARSE
+from pyairtable.formulas import EQ, NE, GT, GTE, LT, LTE
+from pyairtable.formulas import FIND, LEFT, LEN
+from pyairtable.formulas import Field, Formula
 from aracnid_core.base import BaseConnector
+from aracnid_core.query_dsl import QueryDict
 
 
 class AirtableConnector(BaseConnector):
@@ -22,7 +29,7 @@ class AirtableConnector(BaseConnector):
             dict[str, bool]: Mapping of capabilities.
         """
         return {
-            "supports_filters": True,
+            "supports_query": True,
             "supports_partial_update": True,
             "supports_replace_one": True,
             "supports_soft_delete": False,
@@ -152,31 +159,6 @@ class AirtableConnector(BaseConnector):
         return self._normalize_record(rec) if rec else None
 
 
-    def read_many(self, filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
-        """Read multiple records from the Airtable table, optionally filtered by a dictionary of field values.
-
-        Args:
-            filters (dict[str, Any] | None): A dictionary of field values to filter records.
-
-        Returns:
-            list[dict[str, Any]]: A list of records matching the filters.
-
-        Raises:
-            ValueError: If filters is not a dict or None.
-        """
-        if filters is not None and not isinstance(filters, dict):
-            raise ValueError("filters must be a dict or None")
-
-        filter_obj: dict[str, Any] = dict(filters) if filters else {}
-
-        try:
-            recs = self.table.all(formula=match(filter_obj)) if filter_obj else self.table.all()
-        except Exception as exc:
-            raise self._as_runtime_error(exc, "read_many") from exc
-
-        return [self._normalize_record(rec) for rec in recs]
-
-
     def update_one(self, record_id: str, changes: dict[str, Any]) -> dict[str, Any]:
         """Update a single record in the Airtable table by its ID.
         
@@ -282,3 +264,85 @@ class AirtableConnector(BaseConnector):
 
         return bool((result or {}).get("deleted", False))
     
+
+    def _read_many_normalized(self, query_dsl: QueryDict) -> list[dict[str, Any]]:
+        """Execute a normalized Query DSL object against Airtable."""
+        formula = self._query_to_formula(query_dsl) if query_dsl else None
+
+        try:
+            recs = self.table.all(formula=formula) if formula else self.table.all()
+        except Exception as exc:
+            raise self._as_runtime_error(exc, "read_many") from exc
+
+        return [self._normalize_record(rec) for rec in recs]
+
+
+    def _query_to_formula(self, node: QueryDict) -> Formula:
+        # logical
+        if "$and" in node:
+            return AND(*(self._query_to_formula(child) for child in node["$and"]))
+        if "$or" in node:
+            return OR(*(self._query_to_formula(child) for child in node["$or"]))
+        if "$not" in node:
+            return NOT(self._query_to_formula(node["$not"]))
+
+        # field-node (normalized form should generally be single-field, but support multi)
+        formulas: list[Formula] = []
+        for field, condition in node.items():
+            formulas.append(self._field_condition_to_formula(field, condition))
+
+        if len(formulas) == 1:
+            return formulas[0]
+        return AND(*formulas)
+
+
+    def _field_condition_to_formula(self, field: str, condition: dict[str, Any]) -> Any:
+        # condition is normalized op-object
+        parts: list[Any] = []
+        for op, value in condition.items():
+            if op == "$eq":
+                parts.append(EQ(Field(field), self._literal(value)))
+            elif op == "$ne":
+                parts.append(NE(Field(field), self._literal(value)))
+            elif op == "$gt":
+                parts.append(GT(Field(field), self._literal(value)))
+            elif op == "$gte":
+                parts.append(GTE(Field(field), self._literal(value)))
+            elif op == "$lt":
+                parts.append(LT(Field(field), self._literal(value)))
+            elif op == "$lte":
+                parts.append(LTE(Field(field), self._literal(value)))
+            elif op == "$in":
+                parts.append(OR(*(EQ(Field(field), self._literal(v)) for v in value)))
+            elif op == "$nin":
+                parts.append(AND(*(NE(Field(field), self._literal(v)) for v in value)))
+            elif op == "$exists":
+                parts.append(NOT(EQ(Field(field), BLANK())) if value else EQ(Field(field), BLANK()))
+            elif op == "$contains":
+                parts.append(GT(FIND(self._literal(value), Field(field)), 0))
+            elif op == "$startsWith":
+                parts.append(EQ(LEFT(Field(field), LEN(self._literal(value))), self._literal(value)))
+            else:
+                raise RuntimeError(f"read_many failed: unsupported operator '{op}'")
+
+        if len(parts) == 1:
+            return parts[0]
+        return AND(*parts)
+
+
+    def _literal(self, value: Any) -> str | int | float | Formula:
+        if isinstance(value, bool):
+            return TRUE() if value else FALSE()
+        if value is None:
+            return BLANK()
+        if isinstance(value, (int, float)):
+            return value
+        if isinstance(value, datetime):
+            dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+            iso = dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+            return DATETIME_PARSE(iso)
+        if isinstance(value, date):
+            # date-only; Airtable date fields compare cleanly with ISO date strings
+            return DATETIME_PARSE(value.isoformat())
+
+        return value

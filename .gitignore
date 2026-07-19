@@ -1,9 +1,10 @@
-__pycache__*
 *.code-workspace
-*.env
 *.egg-info/*
+*.env
+.coverage
+.vscode/*
+__pycache__*
 certs/*
 dist/*
-temp/*
-.vscode/*
 mdb/*
+temp/*
