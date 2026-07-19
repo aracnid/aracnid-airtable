@@ -12,6 +12,7 @@ from datetime import date, datetime, timezone
 import os
 import uuid
 
+from aracnid_core.exceptions import QueryValidationError
 import pytest
 
 from aracnid_airtable.connector import AirtableConnector
@@ -292,3 +293,10 @@ def test_read_many_query_dsl_integration_matrix(connector, seeded_records):
         {"$and": [{"Tag": {"$eq": tag}}, {"Name": {"$contains": "O'"}}]}
     )
     assert _ids(out_contains_quote) == {recs["quote"]["id"]}
+
+
+def test_read_many_query_dsl_unsupported_operator_raises(connector):
+    query = {"Name": {"$regex": "^alp"}}
+
+    with pytest.raises(QueryValidationError, match=r"unsupported field operator '\$regex'"):
+        connector.read_many(query)
