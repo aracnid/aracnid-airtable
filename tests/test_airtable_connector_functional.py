@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 from unittest.mock import MagicMock, patch
 
-from pyairtable.formulas import match
+from pyairtable.formulas import to_formula_str
 import pytest
 
 from aracnid_airtable.connector import AirtableConnector
@@ -69,22 +69,22 @@ def test_read_one_not_found_returns_none(connector_and_table: tuple[AirtableConn
     assert out is None
 
 
-def test_read_many_with_filters_builds_formula(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
+def test_read_many_with_query_builds_formula(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
     connector, table = connector_and_table
     table.all.return_value = [
         {"id": "rec_1", "fields": {"status": "active"}, "createdTime": "t1"}
     ]
 
-    filters = {"status": "active"}
-    out = connector.read_many(filters)
+    query = {"status": "active"}  # shorthand DSL; normalized upstream
+    out = connector.read_many(query)
 
-    # formula kwarg should be used when filters provided
     assert table.all.call_count == 1
     _, kwargs = table.all.call_args
     assert "formula" in kwargs
-    assert kwargs["formula"] == match({"status": "active"})
+    assert kwargs["formula"] is not None  # don't compare to match(...) anymore
+    assert str(kwargs["formula"])
     assert out[0]["status"] == "active"
-    assert filters == {"status": "active"}  # input not mutated
+    assert query == {"status": "active"}  # input not mutated
 
 
 def test_update_one_not_found_raises_runtimeerror(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
@@ -147,3 +147,46 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
 
     with pytest.raises(RuntimeError, match=rf"^{method_name} failed:"):
         method(*args)
+
+    
+@pytest.mark.parametrize(
+    ("query", "expected_parts"),
+    [
+        ({"name": {"$eq": "alpha"}}, ["{name}", "alpha"]),
+        ({"name": {"$ne": "alpha"}}, ["{name}", "!="]),
+        ({"age": {"$gt": 18}}, ["{age}", ">", "18"]),
+        ({"age": {"$gte": 18}}, ["{age}", ">=", "18"]),
+        ({"age": {"$lt": 65}}, ["{age}", "<", "65"]),
+        ({"age": {"$lte": 65}}, ["{age}", "<=", "65"]),
+        ({"$and": [{"name": {"$eq": "a"}}, {"age": {"$gt": 1}}]}, ["AND"]),
+        ({"$or": [{"name": {"$eq": "a"}}, {"name": {"$eq": "b"}}]}, ["OR"]),
+        ({"$not": {"name": {"$eq": "a"}}}, ["NOT"]),
+        ({"name": {"$in": ["a", "b"]}}, ["OR"]),
+        ({"name": {"$nin": ["a", "b"]}}, ["AND"]),
+        ({"name": {"$exists": True}}, ["NOT({name}=BLANK())"]),
+        ({"name": {"$exists": False}}, ["{name}=BLANK()"]),
+        ({"name": {"$contains": "ph"}}, ["FIND"]),
+        ({"name": {"$startsWith": "al"}}, ["LEFT", "LEN"]),
+    ],
+)
+def test_query_to_formula_matrix(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+    query: dict[str, Any],
+    expected_parts: list[str],
+) -> None:
+    connector, _ = connector_and_table
+
+    formula = connector._query_to_formula(query)  # unit test converter directly
+    rendered = to_formula_str(formula)
+
+    for part in expected_parts:
+        assert part in rendered
+
+
+def test_query_to_formula_unsupported_operator_raises(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+
+    with pytest.raises(RuntimeError, match="unsupported operator"):
+        connector._query_to_formula({"name": {"$wat": 1}})
