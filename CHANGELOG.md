@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] - 2026-07-19
+
+### Added
+
+- Implemented Query DSL support for `read_many()` in the Airtable connector.
+- Added support for core query patterns and operators used in application queries, including:
+  - field equality (shorthand and `$eq`)
+  - `$ne`
+  - `$exists` (`true` / `false`)
+  - `$contains`
+  - logical `$and` composition
+- Expanded integration test coverage for Query DSL behavior across:
+  - logical/operator combinations
+  - numeric literal equivalency (`int`, `float`)
+  - date/datetime matching scenarios
+  - string quoting/escaping edge cases (quotes, backslashes, whitespace, newlines, unicode)
+
+### Changed
+
+- Improved formula/literal translation for Query DSL-driven `read_many()` queries to produce valid Airtable formulas across supported operators and literal types.
+
+### Fixed
+
+- Fixed query formula composition issues that could produce invalid Airtable formula expressions in nested/combined Query DSL filters.
+- Added integration test teardown cleanup so seeded records are deleted after test runs, preventing leftover Airtable test data.
+
 ## [1.0.3] - 2026-07-15
 
 ### Added
