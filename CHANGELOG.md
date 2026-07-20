@@ -6,6 +6,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.2.0] - 2026-07-19
+
+### Changed
+
+- Integrated `aracnid-core` v1.2.0 temporal semantics into the Airtable connector.
+- Updated Airtable write paths (`create_one`, `update_one`, `replace_one`) to normalize aware `datetime` values to Airtable-safe UTC ISO-8601 (`...Z`) literals.
+- Added strict write-path validation for temporal inputs:
+  - naive `datetime` values are rejected with `ValueError`,
+  - `date` values are normalized as ISO calendar dates (`YYYY-MM-DD`).
+
+### Contract / Conformance
+
+- Extended contract conformance re-exports to include Query DSL temporal semantics tests:
+  - accepts timezone-aware local datetimes,
+  - accepts timezone-aware UTC datetimes,
+  - rejects naive datetimes,
+  - accepts `date` literals.
+
+### Integration Tests
+
+- Added integration coverage for temporal behavior end-to-end with Airtable:
+  - naive datetime rejection symmetry across `create_one` / `update_one` / `replace_one`,
+  - date write round-trip behavior across `create_one` / `update_one` / `replace_one`,
+  - Query DSL date equality with Python `date` literals,
+  - DST-focused instant-equivalence checks (local aware datetime vs equivalent UTC instant).
+
 ## [1.1.0] - 2026-07-19
 
 ### Added
