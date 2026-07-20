@@ -14,14 +14,14 @@ files = [
 
 [[package]]
 name = "aracnid-core"
-version = "1.1.0"
+version = "1.2.0"
 description = "Base interfaces for Aracnid integration connectors"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "aracnid_core-1.1.0-py3-none-any.whl", hash = "sha256:5462d506e6a20aa9c4d6a7158f048e7e36e7735b8427b9ad3d231c3e9529cd00"},
-    {file = "aracnid_core-1.1.0.tar.gz", hash = "sha256:de34ca1dccba4dc04e62156b6929495c79d969c0130ccc3b13d25f6d81d81e7d"},
+    {file = "aracnid_core-1.2.0-py3-none-any.whl", hash = "sha256:e83c46a728f474873e1da73c163c400ddbf4021d0f60cb718f4c19d8e9bca8d8"},
+    {file = "aracnid_core-1.2.0.tar.gz", hash = "sha256:8af4c8c952a70e06b0b14bb35a555152afa3fb089d388722796012940736bec1"},
 ]
 
 [[package]]
@@ -281,7 +281,7 @@ description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 groups = ["dev"]
-markers = "sys_platform == \"win32\" or os_name == \"nt\""
+markers = "os_name == \"nt\" or sys_platform == \"win32\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},

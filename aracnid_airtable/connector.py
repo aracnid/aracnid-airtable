@@ -108,24 +108,51 @@ class AirtableConnector(BaseConnector):
         return "404" in msg or "not found" in msg
 
 
+    def _normalize_field_value_for_write(self, value: Any) -> Any:
+        """Normalize a field value for writing to Airtable.
+
+        Args:
+            value (Any): The field value to normalize.
+
+        Returns:
+            Any: The normalized field value.
+        """
+        if isinstance(value, datetime):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("datetime field values must be timezone-aware (tzinfo required)")
+            return (
+                value.astimezone(timezone.utc)
+                .isoformat(timespec="milliseconds")
+                .replace("+00:00", "Z")
+            )
+        if isinstance(value, date): 
+            return value.isoformat()
+        return value
+
+
     def create_one(self, record: dict[str, Any]) -> dict[str, Any]:
         """Create a new record in the Airtable table.
 
         Args:
             record (dict[str, Any]): The record to create.
-            
+
         Returns:
             dict[str, Any]: The created record.
 
         Raises:
-            ValueError: If record is not a dict or is empty.
+            ValueError: If record is not a dict/empty, or contains naive datetime values.
         """
         if not isinstance(record, dict):
             raise ValueError("record must be a dict")
         if not record:
             raise ValueError("record must not be empty")
 
-        fields = dict(record)  # do not mutate caller input
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in record.items()
+        }
+
         try:
             created = self.table.create(fields)
         except Exception as exc:
@@ -180,7 +207,12 @@ class AirtableConnector(BaseConnector):
             raise ValueError("changes must not be empty")
 
         rid = record_id.strip()
-        fields = dict(changes)  # do not mutate caller input
+
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in changes.items()
+        }
 
         try:
             updated = self.table.update(rid, fields)
@@ -216,7 +248,12 @@ class AirtableConnector(BaseConnector):
             raise ValueError("new_record must not be empty")
 
         rid = record_id.strip()
-        fields = dict(new_record)  # do not mutate caller input
+
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in new_record.items()
+        }
 
         try:
             replaced = self.table.update(rid, fields, replace=True)
@@ -266,7 +303,14 @@ class AirtableConnector(BaseConnector):
     
 
     def _read_many_normalized(self, query_dsl: QueryDict) -> list[dict[str, Any]]:
-        """Execute a normalized Query DSL object against Airtable."""
+        """Execute a normalized Query DSL object against Airtable.
+        
+        Args:
+            query_dsl (QueryDict): The normalized Query DSL object.
+
+        Returns:
+            list[dict[str, Any]]: A list of normalized records matching the query.
+        """
         formula = self._query_to_formula(query_dsl) if query_dsl else None
 
         try:
@@ -278,6 +322,14 @@ class AirtableConnector(BaseConnector):
 
 
     def _query_to_formula(self, node: QueryDict) -> Formula:
+        """Convert a normalized Query DSL node into an Airtable formula.
+
+        Args:
+            node (QueryDict): The normalized Query DSL node.
+
+        Returns:
+            Formula: The corresponding Airtable formula.
+        """
         # logical
         if "$and" in node:
             return AND(*(self._query_to_formula(child) for child in node["$and"]))
@@ -297,6 +349,15 @@ class AirtableConnector(BaseConnector):
 
 
     def _field_condition_to_formula(self, field: str, condition: dict[str, Any]) -> Any:
+        """Convert a field condition into an Airtable formula.
+
+        Args:
+            field (str): The field name.
+            condition (dict[str, Any]): The field condition.
+
+        Returns:
+            Any: The corresponding Airtable formula.
+        """
         # condition is normalized op-object
         parts: list[Any] = []
         for op, value in condition.items():
@@ -331,6 +392,14 @@ class AirtableConnector(BaseConnector):
 
 
     def _literal(self, value: Any) -> str | int | float | Formula:
+        """Convert a value into an Airtable formula literal.
+
+        Args:
+            value (Any): The value to convert.
+
+        Returns:
+            str | int | float | Formula: The corresponding Airtable formula literal.
+        """
         if isinstance(value, bool):
             return TRUE() if value else FALSE()
         if value is None:

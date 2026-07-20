@@ -79,6 +79,29 @@ def test_read_many_with_query_returns_matching_records(
     assert created["id"] in ids
 
 
+def test_read_many_date_equality_with_python_date_literal(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    d = date(2026, 7, 22)
+    tag = f"it-date-{uuid.uuid4().hex[:8]}"
+
+    created = connector.create_one(
+        {"Name": "date-eq", "Tag": tag, "DueDate": d, "Status": "Active"}
+    )
+    created_ids.append(created["id"])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"DueDate": {"$eq": d}},
+            ]
+        }
+    )
+    ids = {r["id"] for r in rows}
+    assert created["id"] in ids
+    
+    
 def test_update_one_persists_changes(
     connector: AirtableConnector, created_ids: list[str]
 ) -> None:
@@ -300,3 +323,79 @@ def test_read_many_query_dsl_unsupported_operator_raises(connector):
 
     with pytest.raises(QueryValidationError, match=r"unsupported field operator '\$regex'"):
         connector.read_many(query)
+
+
+def test_create_one_naive_datetime_raises_valueerror(connector: AirtableConnector) -> None:
+    naive_dt = datetime(2026, 7, 19, 12, 34, 56)  # tzinfo=None
+    with pytest.raises(ValueError, match=r"datetime field values must be timezone-aware|timezone-aware|tzinfo"):
+        connector.create_one({"Name": f"it-{uuid.uuid4().hex[:8]}", "EventAt": naive_dt})
+
+
+def test_update_one_naive_datetime_raises_valueerror(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one({"Name": f"it-{uuid.uuid4().hex[:8]}", "Status": "New"})
+    created_ids.append(created["id"])
+
+    naive_dt = datetime(2026, 7, 19, 12, 34, 56)  # tzinfo=None
+    with pytest.raises(ValueError, match=r"datetime field values must be timezone-aware|timezone-aware|tzinfo"):
+        connector.update_one(created["id"], {"EventAt": naive_dt})
+
+
+def test_replace_one_naive_datetime_raises_valueerror(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one({"Name": f"it-{uuid.uuid4().hex[:8]}", "Status": "New"})
+    created_ids.append(created["id"])
+
+    naive_dt = datetime(2026, 7, 19, 12, 34, 56)  # tzinfo=None
+    with pytest.raises(ValueError, match=r"datetime field values must be timezone-aware|timezone-aware|tzinfo"):
+        connector.replace_one(created["id"], {"Name": "replaced", "EventAt": naive_dt})
+
+
+def test_create_one_date_field_roundtrip(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    d = date(2026, 7, 19)
+    created = connector.create_one(
+        {"Name": f"it-{uuid.uuid4().hex[:8]}", "DueDate": d, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    # Airtable may return date-like values as strings; assert calendar-day semantic.
+    assert str(got["DueDate"]).startswith("2026-07-19")
+
+
+def test_update_one_date_field_roundtrip(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one({"Name": f"it-{uuid.uuid4().hex[:8]}", "Status": "New"})
+    created_ids.append(created["id"])
+
+    d = date(2026, 7, 20)
+    updated = connector.update_one(created["id"], {"DueDate": d})
+    assert updated["id"] == created["id"]
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert str(got["DueDate"]).startswith("2026-07-20")
+
+
+def test_replace_one_date_field_roundtrip(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one(
+        {"Name": f"it-{uuid.uuid4().hex[:8]}", "Status": "New", "Category": "Old"}
+    )
+    created_ids.append(created["id"])
+
+    d = date(2026, 7, 21)
+    replaced = connector.replace_one(created["id"], {"Name": "replaced", "DueDate": d})
+    assert replaced["id"] == created["id"]
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert got["Name"] == "replaced"
+    assert str(got["DueDate"]).startswith("2026-07-21")
