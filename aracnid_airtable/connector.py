@@ -108,24 +108,51 @@ class AirtableConnector(BaseConnector):
         return "404" in msg or "not found" in msg
 
 
+    def _normalize_field_value_for_write(self, value: Any) -> Any:
+        """Normalize a field value for writing to Airtable.
+
+        Args:
+            value (Any): The field value to normalize.
+
+        Returns:
+            Any: The normalized field value.
+        """
+        if isinstance(value, datetime):
+            if value.tzinfo is None or value.utcoffset() is None:
+                raise ValueError("datetime field values must be timezone-aware (tzinfo required)")
+            return (
+                value.astimezone(timezone.utc)
+                .isoformat(timespec="milliseconds")
+                .replace("+00:00", "Z")
+            )
+        if isinstance(value, date): 
+            return value.isoformat()
+        return value
+
+
     def create_one(self, record: dict[str, Any]) -> dict[str, Any]:
         """Create a new record in the Airtable table.
 
         Args:
             record (dict[str, Any]): The record to create.
-            
+
         Returns:
             dict[str, Any]: The created record.
 
         Raises:
-            ValueError: If record is not a dict or is empty.
+            ValueError: If record is not a dict/empty, or contains naive datetime values.
         """
         if not isinstance(record, dict):
             raise ValueError("record must be a dict")
         if not record:
             raise ValueError("record must not be empty")
 
-        fields = dict(record)  # do not mutate caller input
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in record.items()
+        }
+
         try:
             created = self.table.create(fields)
         except Exception as exc:
@@ -180,7 +207,12 @@ class AirtableConnector(BaseConnector):
             raise ValueError("changes must not be empty")
 
         rid = record_id.strip()
-        fields = dict(changes)  # do not mutate caller input
+
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in changes.items()
+        }
 
         try:
             updated = self.table.update(rid, fields)
@@ -216,7 +248,12 @@ class AirtableConnector(BaseConnector):
             raise ValueError("new_record must not be empty")
 
         rid = record_id.strip()
-        fields = dict(new_record)  # do not mutate caller input
+
+        # Do not mutate caller input.
+        fields = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in new_record.items()
+        }
 
         try:
             replaced = self.table.update(rid, fields, replace=True)
