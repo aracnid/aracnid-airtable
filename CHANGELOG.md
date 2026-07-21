@@ -6,6 +6,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.0] - 2026-07-21
+
+### Added
+
+- Added Query DSL `sort` support to `read_many(...)` in the Airtable connector.
+- Added Mongo-style sort input support via core DSL shape:
+  - `sort=[{"FieldA": 1}, {"FieldB": -1}]`
+- Added Airtable sort translation helper for pyairtable-compatible ordering.
+
+### Changed
+
+- Updated normalized adapter read path to accept both:
+  - `query_dsl`
+  - `sort_dsl`
+- Mapped normalized sort DSL to pyairtable sort format:
+  - ascending: `"FieldName"`
+  - descending: `"-FieldName"`
+- Preserved sort precedence order across multi-field sorts.
+- Standardized no-sort handling to an empty sort list (`[]`) in adapter flow.
+
+### Tests
+
+- Expanded functional tests for sort translation and `read_many(..., sort=...)` behavior.
+- Expanded integration tests for:
+  - single-field sorting
+  - multi-key precedence
+  - combined query + sort behavior
+
 ## [v1.2.0] - 2026-07-19
 
 ### Changed
