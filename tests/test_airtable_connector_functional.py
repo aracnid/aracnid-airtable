@@ -190,3 +190,55 @@ def test_query_to_formula_unsupported_operator_raises(
 
     with pytest.raises(RuntimeError, match="unsupported operator"):
         connector._query_to_formula({"name": {"$wat": 1}})
+
+
+def test_sort_to_airtable_sort_none_or_empty_returns_none(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+    assert connector._sort_to_airtable_sort([]) == []
+
+
+def test_sort_to_airtable_sort_single_and_multi_preserves_order(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+
+    out = connector._sort_to_airtable_sort(
+        [{"DueDate": 1}, {"Priority": -1}, {"Name": 1}]
+    )
+
+    assert out == ["DueDate", "-Priority", "Name"]
+
+
+def test_read_many_with_query_and_sort_passes_formula_and_sort(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = [
+        {"id": "rec_1", "fields": {"status": "active"}, "createdTime": "t1"}
+    ]
+
+    out = connector.read_many(
+        {"status": "active"},
+        sort=[{"DueDate": 1}, {"Priority": -1}],
+    )
+
+    assert table.all.call_count == 1
+    _, kwargs = table.all.call_args
+    assert kwargs["formula"] is not None
+    assert kwargs["sort"] == ["DueDate", "-Priority"]
+    assert out[0]["status"] == "active"
+
+
+def test_read_many_with_sort_only_passes_sort_without_formula(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = []
+
+    connector.read_many(sort=[{"CreatedAt": -1}])
+
+    _, kwargs = table.all.call_args
+    assert kwargs["formula"] is None
+    assert kwargs["sort"] == ["-CreatedAt"]
