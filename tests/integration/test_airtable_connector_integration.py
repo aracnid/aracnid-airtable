@@ -399,3 +399,43 @@ def test_replace_one_date_field_roundtrip(
     assert got is not None
     assert got["Name"] == "replaced"
     assert str(got["DueDate"]).startswith("2026-07-21")
+
+
+def test_read_many_sort_single_field_ascending(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-sort-{uuid.uuid4().hex[:8]}"
+
+    r_late = connector.create_one({"Name": "late", "Tag": tag, "OrderKey": 30})
+    r_mid = connector.create_one({"Name": "mid", "Tag": tag, "OrderKey": 20})
+    r_early = connector.create_one({"Name": "early", "Tag": tag, "OrderKey": 10})
+    created_ids.extend([r_late["id"], r_mid["id"], r_early["id"]])
+
+    rows = connector.read_many(
+        {"Tag": {"$eq": tag}},
+        sort=[{"OrderKey": 1}],
+    )
+
+    ordered = [r for r in rows if r.get("Tag") == tag]
+    assert [r["id"] for r in ordered][:3] == [r_early["id"], r_mid["id"], r_late["id"]]
+
+
+def test_read_many_sort_multi_field_precedence(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-sort2-{uuid.uuid4().hex[:8]}"
+
+    # Same DueDate, differing Priority -> secondary key should decide within same DueDate
+    r1 = connector.create_one({"Name": "a", "Tag": tag, "DueDate": "2026-07-20", "Priority": 1})
+    r2 = connector.create_one({"Name": "b", "Tag": tag, "DueDate": "2026-07-20", "Priority": 3})
+    r3 = connector.create_one({"Name": "c", "Tag": tag, "DueDate": "2026-07-19", "Priority": 2})
+    created_ids.extend([r1["id"], r2["id"], r3["id"]])
+
+    rows = connector.read_many(
+        {"Tag": {"$eq": tag}},
+        sort=[{"DueDate": 1}, {"Priority": -1}],
+    )
+
+    ordered = [r for r in rows if r.get("Tag") == tag]
+    # First by DueDate asc => r3 first; then within 2026-07-20 by Priority desc => r2 before r1
+    assert [r["id"] for r in ordered][:3] == [r3["id"], r2["id"], r1["id"]]

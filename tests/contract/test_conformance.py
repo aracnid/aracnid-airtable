@@ -7,6 +7,7 @@ import pytest
 from aracnid_core.contract_tests import base_connector_contract as contract_tests
 from aracnid_core.contract_tests import (
     query_dsl_temporal_contract as temporal_contract_tests,
+    query_dsl_sort_contract as sort_contract_tests,
 )
 from aracnid_airtable.connector import AirtableConnector
 
@@ -40,6 +41,20 @@ test_update_one_validates_input = contract_tests.test_update_one_validates_input
 test_replace_one_validates_input = contract_tests.test_replace_one_validates_input
 test_delete_one_validates_input = contract_tests.test_delete_one_validates_input
 test_input_objects_not_mutated = contract_tests.test_input_objects_not_mutated
+
+# Re-export Query DSL Sort contract tests
+test_normalize_sort_accepts_none = (
+    sort_contract_tests.test_normalize_sort_accepts_none
+)
+test_normalize_sort_accepts_single_and_multi = (
+    sort_contract_tests.test_normalize_sort_accepts_single_and_multi
+)
+test_normalize_sort_rejects_invalid_shapes = (
+    sort_contract_tests.test_normalize_sort_rejects_invalid_shapes
+)
+test_normalize_sort_rejects_duplicate_fields = (
+    sort_contract_tests.test_normalize_sort_rejects_duplicate_fields
+)
 
 # Re-export Query DSL temporal contract tests.
 test_normalize_query_accepts_timezone_aware_datetime_local_tz = (

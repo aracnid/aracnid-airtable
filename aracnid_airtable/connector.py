@@ -15,7 +15,7 @@ from pyairtable.formulas import EQ, NE, GT, GTE, LT, LTE
 from pyairtable.formulas import FIND, LEFT, LEN
 from pyairtable.formulas import Field, Formula
 from aracnid_core.base import BaseConnector
-from aracnid_core.query_dsl import QueryDict
+from aracnid_core.query_dsl import QueryDict, SortSpec
 
 
 class AirtableConnector(BaseConnector):
@@ -302,19 +302,21 @@ class AirtableConnector(BaseConnector):
         return bool((result or {}).get("deleted", False))
     
 
-    def _read_many_normalized(self, query_dsl: QueryDict) -> list[dict[str, Any]]:
+    def _read_many_normalized(self, query_dsl: QueryDict, sort_dsl: SortSpec) -> list[dict[str, Any]]:
         """Execute a normalized Query DSL object against Airtable.
         
         Args:
             query_dsl (QueryDict): The normalized Query DSL object.
+            sort_dsl (SortSpec): The normalized Sort specification.
 
         Returns:
             list[dict[str, Any]]: A list of normalized records matching the query.
         """
         formula = self._query_to_formula(query_dsl) if query_dsl else None
+        airtable_sort = self._sort_to_airtable_sort(sort_dsl)
 
         try:
-            recs = self.table.all(formula=formula) if formula else self.table.all()
+            recs = self.table.all(formula=formula, sort=airtable_sort)
         except Exception as exc:
             raise self._as_runtime_error(exc, "read_many") from exc
 
@@ -415,3 +417,27 @@ class AirtableConnector(BaseConnector):
             return DATETIME_PARSE(value.isoformat())
 
         return value
+
+
+    def _sort_to_airtable_sort(self, sort_dsl: SortSpec) -> list[str]:
+        """Translate normalized SortSpec into Airtable sort payload.
+
+        pyairtable format:
+        - ascending: "FieldName"
+        - descending: "-FieldName"
+        
+        Args:
+            sort_dsl (SortSpec): The normalized Sort specification.
+
+        Returns:
+            list[str]: The Airtable sort payload.
+        """
+        if not sort_dsl:
+            return []
+
+        out: list[str] = []
+        for entry in sort_dsl:
+            field, direction = next(iter(entry.items()))
+            out.append(field if direction == 1 else f'-{field}')
+
+        return out
