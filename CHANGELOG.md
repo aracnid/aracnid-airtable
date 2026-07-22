@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.2] - 2026-07-22
+
+### Added
+
+- Added schema-aware read coercion for Airtable field types:
+  - `date` → `datetime.date`
+  - `dateTime` → timezone-aware `datetime.datetime`
+- Added shared contract test shims to run `aracnid-core` datetime/timezone contract coverage:
+  - `tests/contract/test_datetime_tz_contract.py`
+  - `tests/contract/test_timezone_env_contract.py`
+
+### Changed
+
+- Integrated `aracnid-core` timezone handling for Airtable `dateTime` coercion:
+  - `ARACNID_DATETIME_TZ_MODE=utc|local|keep`
+  - `ARACNID_LOCAL_TIMEZONE=<IANA timezone>` (required when mode is `local`)
+- Datetime coercion now follows shared core behavior:
+  - `utc` (default) normalizes aware datetimes to UTC
+  - `local` normalizes to explicitly configured IANA timezone
+  - `keep` preserves source timezone/offset
+- Record normalization now applies coercion based on Airtable schema metadata via cached field-type mapping.
+
+### Validation
+
+- Invalid datetime/date strings continue to pass through unchanged.
+- Naive datetimes are rejected per shared core validation rules.
+- `ARACNID_DATETIME_TZ_MODE=local` without `ARACNID_LOCAL_TIMEZONE` fails fast with `ValueError`.
+
+### Compatibility
+
+- Backward compatible for consumers treating values generically.
+- Consumers that assumed Date/DateTime values were always strings should update expectations to Python-native date/datetime types.
+
 ## [v1.3.0] - 2026-07-21
 
 ### Added
