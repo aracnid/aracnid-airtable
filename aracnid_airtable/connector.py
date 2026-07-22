@@ -21,23 +21,6 @@ from aracnid_core.query_dsl import QueryDict, SortSpec
 class AirtableConnector(BaseConnector):
     """A connector for Airtable using the pyairtable library.
     """
-    @property
-    def capabilities(self) -> dict[str, bool]:
-        """Returns a mapping of capabilities.
-
-        Returns:
-            dict[str, bool]: Mapping of capabilities.
-        """
-        return {
-            "supports_query": True,
-            "supports_partial_update": True,
-            "supports_replace_one": True,
-            "supports_soft_delete": False,
-            "supports_hard_delete": True,
-            "supports_transactions": False,
-        }
-
-
     def __init__(self, base_id: str, table_name: str):
         """Initialize the AirtableConnector.
 
@@ -62,7 +45,99 @@ class AirtableConnector(BaseConnector):
         self.table_name = table_name.strip()
 
         self.api = Api(self.air_api_key)
-        self.table = self.api.table(self.base_id, self.table_name)
+        self.base = self.api.base(self.base_id)
+        self.table = self.base.table(self.table_name)
+
+        # lazy-loaded cache: field name -> field type
+        self._field_types: dict[str, str] | None = None
+
+
+    @property
+    def capabilities(self) -> dict[str, bool]:
+        """Returns a mapping of capabilities.
+
+        Returns:
+            dict[str, bool]: Mapping of capabilities.
+        """
+        return {
+            "supports_query": True,
+            "supports_partial_update": True,
+            "supports_replace_one": True,
+            "supports_soft_delete": False,
+            "supports_hard_delete": True,
+            "supports_transactions": False,
+        }
+
+
+    def _load_field_types(self) -> dict[str, str]:
+        """Load Airtable field types for this table (best effort).
+
+        Returns empty mapping if metadata lookup is unavailable.
+
+        Returns:
+            dict[str, str]: Mapping of field names to field types.
+        """
+        if self._field_types is not None:
+            return self._field_types
+
+        mapping: dict[str, str] = {}
+        try:
+            # pyairtable typically exposes schema helpers either on Api/Base.
+            # Adapt this block to your exact pyairtable version if needed.
+            # Pattern:
+            #   base = self.api.base(self.base_id)
+            #   table_schema = base.table(self.table_name).schema()   OR base.schema()
+            # then find the target table's fields.
+            base_schema = self.base.schema()
+
+            target = None
+            for tbl in getattr(base_schema, "tables", []) or []:
+                if getattr(tbl, "name", None) == self.table_name:
+                    target = tbl
+                    break
+
+            if target is not None:
+                for f in getattr(target, "fields", []) or []:
+                    fname = getattr(f, "name", None)
+                    ftype = getattr(f, "type", None)
+                    if fname and ftype:
+                        mapping[str(fname)] = str(ftype)
+
+        except Exception:
+            # Non-fatal: no metadata scope/permission/version mismatch/etc.
+            mapping = {}
+
+        self._field_types = mapping
+        return mapping
+
+
+    @staticmethod
+    def _coerce_by_airtable_type(field_type: str, value: Any) -> Any:
+        """Coerce value using Airtable-declared field type.
+        
+        Args:
+            field_type (str): The Airtable field type.
+            value (Any): The value to coerce.
+
+        Returns:
+            Any: The coerced value, or the original value if no coercion is applicable.
+        """
+        if not isinstance(value, str):
+            return value
+
+        if field_type == "date":
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return value
+
+        if field_type == "dateTime":
+            try:
+                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            except ValueError:
+                return value
+
+        return value
 
 
     def _normalize_record(self, rec: RecordDict | dict[str, Any]) -> dict[str, Any]:
@@ -75,11 +150,18 @@ class AirtableConnector(BaseConnector):
             dict[str, Any]: The normalized record.
         """
         fields = rec.get("fields") or {}
-        return {
-            "id": rec.get("id"),
-            **fields,
-            "_created_time": rec.get("createdTime"),
-        }
+        out: dict[str, Any] = {'id': rec['id'], '_created_time': rec.get('createdTime')}
+
+        field_types = self._load_field_types()
+
+        for k, v in fields.items():
+            field_type = field_types.get(k)
+            if field_type:
+                out[k] = self._coerce_by_airtable_type(field_type, v)
+            else:
+                out[k] = v
+
+        return out
 
 
     def _as_runtime_error(self, exc: Exception, op: str) -> RuntimeError:

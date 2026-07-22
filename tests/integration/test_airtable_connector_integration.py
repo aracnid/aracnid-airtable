@@ -439,3 +439,76 @@ def test_read_many_sort_multi_field_precedence(
     ordered = [r for r in rows if r.get("Tag") == tag]
     # First by DueDate asc => r3 first; then within 2026-07-20 by Priority desc => r2 before r1
     assert [r["id"] for r in ordered][:3] == [r3["id"], r2["id"], r1["id"]]
+
+
+def test_read_one_coerces_date_field_to_python_date(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    d = date(2026, 7, 22)
+    created = connector.create_one(
+        {"Name": f"it-coerce-date-{uuid.uuid4().hex[:8]}", "DueDate": d, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["DueDate"], date)
+    assert got["DueDate"] == d
+
+
+def test_read_one_coerces_datetime_field_to_python_datetime(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    dt = datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
+    created = connector.create_one(
+        {"Name": f"it-coerce-dt-{uuid.uuid4().hex[:8]}", "EventAt": dt, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["EventAt"], datetime)
+    # normalize to UTC-aware comparison
+    assert got["EventAt"].astimezone(timezone.utc) == dt
+
+
+def test_read_many_coerces_date_and_datetime_fields(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-coerce-many-{uuid.uuid4().hex[:8]}"
+    d = date(2026, 7, 23)
+    dt = datetime(2026, 7, 23, 1, 2, 3, tzinfo=timezone.utc)
+
+    created = connector.create_one(
+        {
+            "Name": "coerce-many",
+            "Tag": tag,
+            "DueDate": d,
+            "EventAt": dt,
+            "Status": "Active",
+        }
+    )
+    created_ids.append(created["id"])
+
+    rows = connector.read_many({"Tag": {"$eq": tag}})
+    row = next(r for r in rows if r["id"] == created["id"])
+
+    assert isinstance(row["DueDate"], date)
+    assert row["DueDate"] == d
+
+    assert isinstance(row["EventAt"], datetime)
+    assert row["EventAt"].astimezone(timezone.utc) == dt
+
+
+def test_read_one_non_date_string_field_remains_string(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one(
+        {"Name": "2026-07-22", "Status": "New"}  # date-looking text in a text field
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["Name"], str)
+    assert got["Name"] == "2026-07-22"

@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+from datetime import date, datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -242,3 +241,103 @@ def test_read_many_with_sort_only_passes_sort_without_formula(
     _, kwargs = table.all.call_args
     assert kwargs["formula"] is None
     assert kwargs["sort"] == ["-CreatedAt"]
+
+
+@pytest.mark.parametrize(
+    ("field_type", "raw", "expected_type", "expected_value"),
+    [
+        ("date", "2026-07-22", date, date(2026, 7, 22)),
+        (
+            "dateTime",
+            "2026-07-22T12:34:56.000Z",
+            datetime,
+            datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc),
+        ),
+        ("singleLineText", "2026-07-22", str, "2026-07-22"),  # untouched for non-date types
+    ],
+)
+def test_coerce_by_airtable_type_happy_path(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+    field_type: str,
+    raw: str,
+    expected_type: type,
+    expected_value: Any,
+) -> None:
+    connector, _ = connector_and_table
+
+    out = connector._coerce_by_airtable_type(field_type, raw)
+
+    assert isinstance(out, expected_type)
+    assert out == expected_value
+
+
+@pytest.mark.parametrize(
+    ("field_type", "raw"),
+    [
+        ("date", "not-a-date"),
+        ("dateTime", "not-a-datetime"),
+        ("dateTime", "2026-13-99T99:99:99Z"),
+    ],
+)
+def test_coerce_by_airtable_type_invalid_strings_passthrough(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+    field_type: str,
+    raw: str,
+) -> None:
+    connector, _ = connector_and_table
+
+    out = connector._coerce_by_airtable_type(field_type, raw)
+
+    assert out == raw
+
+
+@pytest.mark.parametrize(
+    ("field_type", "raw"),
+    [
+        ("date", 123),
+        ("dateTime", True),
+        ("date", None),
+        ("dateTime", {"x": 1}),
+    ],
+)
+def test_coerce_by_airtable_type_non_string_passthrough(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+    field_type: str,
+    raw: Any,
+) -> None:
+    connector, _ = connector_and_table
+
+    out = connector._coerce_by_airtable_type(field_type, raw)
+
+    assert out is raw
+
+
+def test_normalize_record_applies_schema_typed_coercion(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+
+    # bypass metadata call and provide deterministic schema map
+    connector._field_types = {
+        "DueDate": "date",
+        "EventAt": "dateTime",
+        "Name": "singleLineText",
+    }
+
+    rec = {
+        "id": "rec_1",
+        "fields": {
+            "DueDate": "2026-07-22",
+            "EventAt": "2026-07-22T12:34:56.000Z",
+            "Name": "alpha",
+        },
+        "createdTime": "2026-07-22T00:00:00.000Z",
+    }
+
+    out = connector._normalize_record(rec)
+
+    assert out["id"] == "rec_1"
+    assert out["DueDate"] == date(2026, 7, 22)
+    assert out["EventAt"] == datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
+    assert out["Name"] == "alpha"
+    assert out["_created_time"] == "2026-07-22T00:00:00.000Z"
