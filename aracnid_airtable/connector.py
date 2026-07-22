@@ -16,6 +16,7 @@ from pyairtable.formulas import FIND, LEFT, LEN
 from pyairtable.formulas import Field, Formula
 from aracnid_core.base import BaseConnector
 from aracnid_core.query_dsl import QueryDict, SortSpec
+from aracnid_core import coerce_datetime_timezone, parse_iso_datetime, load_datetime_tz_config_from_env
 
 
 class AirtableConnector(BaseConnector):
@@ -50,6 +51,8 @@ class AirtableConnector(BaseConnector):
 
         # lazy-loaded cache: field name -> field type
         self._field_types: dict[str, str] | None = None
+
+        self._dt_tz_config = load_datetime_tz_config_from_env()
 
 
     @property
@@ -111,8 +114,7 @@ class AirtableConnector(BaseConnector):
         return mapping
 
 
-    @staticmethod
-    def _coerce_by_airtable_type(field_type: str, value: Any) -> Any:
+    def _coerce_by_airtable_type(self, field_type: str, value: Any) -> Any:
         """Coerce value using Airtable-declared field type.
         
         Args:
@@ -126,14 +128,20 @@ class AirtableConnector(BaseConnector):
             return value
 
         if field_type == "date":
+            if not isinstance(value, str):
+                return value
             try:
                 return date.fromisoformat(value)
             except ValueError:
                 return value
 
         if field_type == "dateTime":
+            if not isinstance(value, str):
+                return value
             try:
-                return datetime.fromisoformat(value.replace("Z", "+00:00"))
+                parsed = parse_iso_datetime(value)
+                return coerce_datetime_timezone(parsed, self._dt_tz_config)
+
             except ValueError:
                 return value
 

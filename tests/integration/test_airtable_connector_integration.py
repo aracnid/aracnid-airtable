@@ -512,3 +512,10 @@ def test_read_one_non_date_string_field_remains_string(
     assert got is not None
     assert isinstance(got["Name"], str)
     assert got["Name"] == "2026-07-22"
+
+
+def test_init_fails_for_local_mode_without_tz(monkeypatch):
+    monkeypatch.setenv("ARACNID_DATETIME_TZ_MODE", "local")
+    monkeypatch.delenv("ARACNID_LOCAL_TIMEZONE", raising=False)
+    with pytest.raises(ValueError, match="ARACNID_LOCAL_TIMEZONE is required"):
+        AirtableConnector("base_id", "table_name")
