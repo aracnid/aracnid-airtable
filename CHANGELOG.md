@@ -6,6 +6,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.6] - 2026-07-24
+
+### Changed
+
+- Added Airtable `currency` field read coercion to Python `Decimal`.
+- Added write normalization for Python `Decimal` values when writing to Airtable:
+  - Quantizes to 2 decimal places using `_CURRENCY_QUANT = Decimal("0.01")`.
+  - Converts quantized value to numeric Airtable-compatible input.
+- Kept existing non-currency coercion behavior unchanged while extending currency-specific handling.
+
+### Tests
+
+- Added integration coverage to verify currency read coercion returns `Decimal`.
+- Added round-trip integration coverage for creating records with `Decimal` currency values and reading them back as `Decimal`.
+
+### Notes
+
+- Currency fields now return `Decimal` instead of `float` on reads.
+- This is a backward-compatible patch for connector behavior, but consumers with strict float expectations should update type assertions accordingly.
+
 ## [v1.3.5] - 2026-07-24
 
 ### Changed
