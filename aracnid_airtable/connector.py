@@ -2,7 +2,7 @@
 """
 
 from datetime import date, datetime, timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import os
 import re
 from typing import Any
@@ -26,6 +26,7 @@ ISO_LIKE_DATETIME_RE = re.compile(
     r"(?::\d{2}(?:\.\d{1,6})?)?"
     r"(?:Z|[+-]\d{2}:\d{2})?$"
 )
+_CURRENCY_QUANT = Decimal("0.01")
 
 class AirtableConnector(BaseConnector):
     """A connector for Airtable using the pyairtable library.
@@ -180,9 +181,6 @@ class AirtableConnector(BaseConnector):
         Returns:
             Any: The coerced value, or the original value if no coercion is applicable.
         """
-        if not isinstance(value, (int, float, str)):
-            return value
-
         # handle formula date/date_time fields
         if field_type == "date/date_time":
             if not isinstance(value, str):
@@ -218,7 +216,7 @@ class AirtableConnector(BaseConnector):
                 return value
 
         if field_type == 'currency':
-            if isinstance(value, (int, float, str)):
+            if isinstance(value, (int, float)):
                 try:
                     return Decimal(str(value))
                 except (ValueError, InvalidOperation):
@@ -301,9 +299,10 @@ class AirtableConnector(BaseConnector):
             return value.isoformat()
         
         if isinstance(value, Decimal):
-            return float(value)
-        
-        return value
+            q = value.quantize(_CURRENCY_QUANT, rounding=ROUND_HALF_UP)
+            return float(q)
+
+        return value        
 
 
     def create_one(self, record: dict[str, Any]) -> dict[str, Any]:
