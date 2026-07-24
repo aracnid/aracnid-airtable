@@ -3,6 +3,7 @@
 
 from datetime import date, datetime, timezone
 import os
+import re
 from typing import Any
 
 
@@ -18,6 +19,12 @@ from aracnid_core.base import BaseConnector
 from aracnid_core.query_dsl import QueryDict, SortSpec
 from aracnid_core import coerce_datetime_timezone, parse_iso_datetime, load_datetime_tz_config_from_env
 
+
+ISO_LIKE_DATETIME_RE = re.compile(
+    r"^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}"
+    r"(?::\d{2}(?:\.\d{1,6})?)?"
+    r"(?:Z|[+-]\d{2}:\d{2})?$"
+)
 
 class AirtableConnector(BaseConnector):
     """A connector for Airtable using the pyairtable library.
@@ -72,6 +79,56 @@ class AirtableConnector(BaseConnector):
         }
 
 
+    def _normalize_field_type_name(self, raw: Any) -> str:
+        """Normalize a raw Airtable field type name into a standard string.
+
+        Args:
+            raw (Any): The raw field type name.
+
+        Returns:
+            str: The normalized field type name.
+        """
+        field_name = str(raw or '').strip()
+        if field_name.startswith('FieldType.'):
+            field_name = field_name.split('.', 1)[1]
+        return field_name
+
+
+    def _effective_airtable_type(self, field: dict) -> str:
+        """Determine the effective Airtable field type for a given field.
+
+        Args:
+            field (dict): The field metadata.
+
+        Returns:
+            str: The effective Airtable field type.
+        """
+        if not isinstance(field, dict):
+            return "unknown"
+        base_type = self._normalize_field_type_name(field.get("type"))
+
+        # handle formula fields: treat as underlying type if available, else "formula"
+        if base_type == "formula":
+            options = field.get("options", {})
+            result = options.get("result", {})
+
+            result_type_raw = None
+            if isinstance(result, dict):
+                result_type_raw = result.get('type')
+            else:
+                result_type_raw = result
+
+            # formula dateTimes cannot be determined from schema
+            if result_type_raw == 'date':
+                result_type_raw = 'date/dateTime'
+
+            result_type = self._normalize_field_type_name(result_type_raw)
+
+            return result_type
+
+        return base_type
+
+
     def _load_field_types(self) -> dict[str, str]:
         """Load Airtable field types for this table (best effort).
 
@@ -85,26 +142,19 @@ class AirtableConnector(BaseConnector):
 
         mapping: dict[str, str] = {}
         try:
-            # pyairtable typically exposes schema helpers either on Api/Base.
-            # Adapt this block to your exact pyairtable version if needed.
-            # Pattern:
-            #   base = self.api.base(self.base_id)
-            #   table_schema = base.table(self.table_name).schema()   OR base.schema()
-            # then find the target table's fields.
-            base_schema = self.base.schema()
+            base_schema = self.base.schema().model_dump()
 
             target = None
-            for tbl in getattr(base_schema, "tables", []) or []:
-                if getattr(tbl, "name", None) == self.table_name:
+            for tbl in base_schema.get("tables", []) or []:
+                if tbl.get("name") == self.table_name:
                     target = tbl
                     break
 
             if target is not None:
-                for f in getattr(target, "fields", []) or []:
-                    fname = getattr(f, "name", None)
-                    ftype = getattr(f, "type", None)
-                    if fname and ftype:
-                        mapping[str(fname)] = str(ftype)
+                for f in target.get("fields", []) or []:
+                    fname = f.get("name")
+                    if fname:
+                        mapping[str(fname)] = self._effective_airtable_type(f)
 
         except Exception:
             # Non-fatal: no metadata scope/permission/version mismatch/etc.
@@ -112,6 +162,11 @@ class AirtableConnector(BaseConnector):
 
         self._field_types = mapping
         return mapping
+
+
+    @staticmethod
+    def _looks_like_datetime_string(value: str) -> bool:
+        return bool(ISO_LIKE_DATETIME_RE.match(value.strip()))
 
 
     def _coerce_by_airtable_type(self, field_type: str, value: Any) -> Any:
@@ -126,6 +181,20 @@ class AirtableConnector(BaseConnector):
         """
         if not isinstance(value, str):
             return value
+
+        # handle formula date/dateTime fields
+        if field_type == "date/dateTime":
+            if self._looks_like_datetime_string(value):
+                try:
+                    parsed = parse_iso_datetime(value)
+                    return coerce_datetime_timezone(parsed, self._dt_tz_config)
+                except ValueError:
+                    return value
+            else:
+                try:
+                    return date.fromisoformat(value)
+                except ValueError:
+                    return value
 
         if field_type == "date":
             if not isinstance(value, str):

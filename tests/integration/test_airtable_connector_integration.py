@@ -8,7 +8,7 @@ Set the following environment variables to run these tests:
 - AIRTABLE_TABLE_NAME: The name of the Airtable table to use for testing.
 """
 from collections.abc import Iterator
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import os
 import uuid
 
@@ -470,6 +470,37 @@ def test_read_one_coerces_datetime_field_to_python_datetime(
     assert isinstance(got["EventAt"], datetime)
     # normalize to UTC-aware comparison
     assert got["EventAt"].astimezone(timezone.utc) == dt
+
+
+def test_read_one_coerces_date_formula_field_to_python_date(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    d = date(2026, 7, 22)
+    created = connector.create_one(
+        {"Name": f"it-coerce-date-{uuid.uuid4().hex[:8]}", "DueDate": d, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["DueDateFormula"], date)
+    assert got["DueDateFormula"] == d + timedelta(days=1)  # formula adds 1 day
+
+
+def test_read_one_coerces_datetime_formula_field_to_python_datetime(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    dt = datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
+    created = connector.create_one(
+        {"Name": f"it-coerce-dt-{uuid.uuid4().hex[:8]}", "EventAt": dt, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["EventAtFormula"], datetime)
+    # normalize to UTC-aware comparison
+    assert got["EventAtFormula"].astimezone(timezone.utc) == dt + timedelta(hours=1)  # formula adds 1 hour
 
 
 def test_read_many_coerces_date_and_datetime_fields(
