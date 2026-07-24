@@ -160,7 +160,7 @@ def test_normalize_record_applies_schema_typed_coercion(
     assert out["DueDate"] == date(2026, 7, 22)
     assert out["EventAt"] == datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
     assert out["Name"] == "alpha"
-    assert out["_created_time"] == "2026-07-22T00:00:00.000Z"
+    assert out["_created_time"] == datetime(2026, 7, 22, 0, 0, tzinfo=timezone.utc)
 
 
 def test_normalize_record_non_date_text_unchanged(
