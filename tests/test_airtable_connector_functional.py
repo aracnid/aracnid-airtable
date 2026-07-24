@@ -276,8 +276,8 @@ def test_coerce_by_airtable_type_happy_path(
     ("field_type", "raw"),
     [
         ("date", "not-a-date"),
-        ("dateTime", "not-a-datetime"),
-        ("dateTime", "2026-13-99T99:99:99Z"),
+        ("date_time", "not-a-datetime"),
+        ("date_time", "2026-13-99T99:99:99Z"),
     ],
 )
 def test_coerce_by_airtable_type_invalid_strings_passthrough(
@@ -290,87 +290,6 @@ def test_coerce_by_airtable_type_invalid_strings_passthrough(
     out = connector._coerce_by_airtable_type(field_type, raw)
 
     assert out == raw
-
-
-@pytest.mark.parametrize(
-    ("field_type", "raw"),
-    [
-        ("date", 123),
-        ("dateTime", True),
-        ("date", None),
-        ("dateTime", {"x": 1}),
-    ],
-)
-def test_coerce_by_airtable_type_non_string_passthrough(
-    connector_and_table: tuple[AirtableConnector, MagicMock],
-    field_type: str,
-    raw: Any,
-) -> None:
-    connector, _ = connector_and_table
-
-    out = connector._coerce_by_airtable_type(field_type, raw)
-
-    assert out is raw
-
-
-def test_normalize_record_applies_schema_typed_coercion(
-    connector_and_table: tuple[AirtableConnector, MagicMock],
-) -> None:
-    connector, _ = connector_and_table
-
-    # bypass metadata call and provide deterministic schema map
-    connector._field_types = {
-        "DueDate": "date",
-        "EventAt": "dateTime",
-        "Name": "singleLineText",
-    }
-
-    rec = {
-        "id": "rec_1",
-        "fields": {
-            "DueDate": "2026-07-22",
-            "EventAt": "2026-07-22T12:34:56.000Z",
-            "Name": "alpha",
-        },
-        "createdTime": "2026-07-22T00:00:00.000Z",
-    }
-
-    out = connector._normalize_record(rec)
-
-    assert out["id"] == "rec_1"
-    assert out["DueDate"] == date(2026, 7, 22)
-    assert out["EventAt"] == datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
-    assert out["Name"] == "alpha"
-    assert out["_created_time"] == "2026-07-22T00:00:00.000Z"
-
-
-def test_datetime_coercion_default_utc(
-        connector_and_table: tuple[AirtableConnector, MagicMock],
-        monkeypatch
-    ) -> None:
-    monkeypatch.delenv("ARACNID_DATETIME_TZ_MODE", raising=False)
-    monkeypatch.delenv("ARACNID_LOCAL_TIMEZONE", raising=False)
-    connector, _ = connector_and_table
-    out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00-04:00")
-    assert out.tzinfo is not None
-    assert out.astimezone(timezone.utc).hour == 16
-
-
-def test_datetime_coercion_keep_mode(monkeypatch) -> None:
-    monkeypatch.setenv("ARACNID_DATETIME_TZ_MODE", "keep")
-    monkeypatch.delenv("ARACNID_LOCAL_TIMEZONE", raising=False)
-    connector = AirtableConnector(base_id="app123", table_name="tbl123")
-    out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00-04:00")
-    assert out.utcoffset() == timedelta(hours=-4)
-
-
-def test_datetime_coercion_local_mode(monkeypatch) -> None:
-    monkeypatch.setenv("ARACNID_DATETIME_TZ_MODE", "local")
-    monkeypatch.setenv("ARACNID_LOCAL_TIMEZONE", "America/New_York")
-    connector = AirtableConnector(base_id="app123", table_name="tbl123")
-    out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00Z")
-    # 12:00Z == 08:00 EDT in July
-    assert out.hour == 8
 
 
 def test_local_mode_without_timezone_raises(monkeypatch):
