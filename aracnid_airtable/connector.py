@@ -204,7 +204,7 @@ class AirtableConnector(BaseConnector):
             except ValueError:
                 return value
 
-        if field_type == "date_time":
+        if field_type in ("date_time", "last_modified_time"):
             if not isinstance(value, str):
                 return value
             try:
@@ -227,7 +227,10 @@ class AirtableConnector(BaseConnector):
             dict[str, Any]: The normalized record.
         """
         fields = rec.get("fields") or {}
-        out: dict[str, Any] = {'id': rec['id'], '_created_time': rec.get('createdTime')}
+        out: dict[str, Any] = {'id': rec['id']}
+
+        # normalize createdTime to datetime
+        out["_created_time"] = self._coerce_by_airtable_type("date_time", rec.get('createdTime'))
 
         field_types = self._load_field_types()
 

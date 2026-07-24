@@ -39,7 +39,7 @@ def test_normalize_record_flattens_fields(connector_and_table: tuple[AirtableCon
         "id": "rec_1",
         "name": "alpha",
         "status": "active",
-        "_created_time": "2026-07-15T00:00:00.000Z",
+        "_created_time": datetime(2026, 7, 15, 0, 0, tzinfo=timezone.utc),
     }
 
 

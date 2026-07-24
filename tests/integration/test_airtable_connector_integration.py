@@ -472,6 +472,34 @@ def test_read_one_coerces_datetime_field_to_python_datetime(
     assert got["EventAt"].astimezone(timezone.utc) == dt
 
 
+def test_read_one_coerces_created_time_field_to_python_datetime(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    dt = datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
+    created = connector.create_one(
+        {"Name": f"it-coerce-dt-{uuid.uuid4().hex[:8]}", "EventAt": dt, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["_created_time"], datetime)
+
+
+def test_read_one_coerces_last_modified_time_field_to_python_datetime(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    dt = datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc)
+    created = connector.create_one(
+        {"Name": f"it-coerce-dt-{uuid.uuid4().hex[:8]}", "EventAt": dt, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["Updated"], datetime)
+
+
 def test_read_one_coerces_date_formula_field_to_python_date(
     connector: AirtableConnector, created_ids: list[str]
 ) -> None:
