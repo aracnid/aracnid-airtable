@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.3] - 2026-07-23
+
+### Fixed
+
+- Improved Airtable **formula field** read coercion for date/time values.
+- Added handling for Airtable schema ambiguity where formula outputs that represent datetimes may appear as date-typed in metadata.
+- Formula date-like outputs now use datetime-shape detection to route values through existing datetime coercion when appropriate.
+
+### Changed
+
+- Read normalization remains schema-first, with a targeted fallback for ambiguous formula date/datetime outputs.
+- Existing non-formula `date` / `dateTime` coercion behavior is unchanged.
+
+### Compatibility
+
+- Backward compatible patch release.
+- No timezone policy changes; formula datetime coercion reuses existing connector/core timezone handling.
+
 ## [v1.3.2] - 2026-07-22
 
 ### Added
