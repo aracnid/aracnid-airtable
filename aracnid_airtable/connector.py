@@ -2,6 +2,7 @@
 """
 
 from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 import os
 import re
 from typing import Any
@@ -179,11 +180,13 @@ class AirtableConnector(BaseConnector):
         Returns:
             Any: The coerced value, or the original value if no coercion is applicable.
         """
-        if not isinstance(value, str):
+        if not isinstance(value, (int, float, str)):
             return value
 
         # handle formula date/date_time fields
         if field_type == "date/date_time":
+            if not isinstance(value, str):
+                return value
             if self._looks_like_datetime_string(value):
                 try:
                     parsed = parse_iso_datetime(value)
@@ -213,6 +216,13 @@ class AirtableConnector(BaseConnector):
 
             except ValueError:
                 return value
+
+        if field_type == 'currency':
+            if isinstance(value, (int, float, str)):
+                try:
+                    return Decimal(str(value))
+                except (ValueError, InvalidOperation):
+                    return value
 
         return value
 
@@ -289,6 +299,10 @@ class AirtableConnector(BaseConnector):
             )
         if isinstance(value, date): 
             return value.isoformat()
+        
+        if isinstance(value, Decimal):
+            return float(value)
+        
         return value
 
 
