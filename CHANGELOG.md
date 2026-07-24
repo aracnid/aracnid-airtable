@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.4] - 2026-07-23
+
+### Changed
+
+- Upgraded `pyairtable` to **v3.4.0**.
+- Updated Airtable field type handling to align with `pyairtable` v3.4.0 schema/type representations.
+- Normalized field type name handling across connector coercion paths to support updated type value formats consistently.
+
+### Tests
+
+- Updated field type/coercion tests to reflect `pyairtable` v3.4.0 field type naming.
+- Refreshed related date/datetime and formula-field coercion assertions to match the new normalized type behavior.
+
+### Notes
+
+- This release is focused on dependency alignment and compatibility with `pyairtable` v3.4.0.
+- No intended changes to external connector API behavior beyond field type representation compatibility.
+
 ## [v1.3.3] - 2026-07-23
 
 ### Fixed

@@ -249,7 +249,7 @@ def test_read_many_with_sort_only_passes_sort_without_formula(
     [
         ("date", "2026-07-22", date, date(2026, 7, 22)),
         (
-            "dateTime",
+            "date_time",
             "2026-07-22T12:34:56.000Z",
             datetime,
             datetime(2026, 7, 22, 12, 34, 56, tzinfo=timezone.utc),

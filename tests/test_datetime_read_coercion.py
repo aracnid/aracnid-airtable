@@ -32,9 +32,9 @@ def connector_and_table(
     ("field_type", "raw"),
     [
         ("date", 123),
-        ("dateTime", True),
+        ("date_time", True),
         ("date", None),
-        ("dateTime", {"x": 1}),
+        ("date_time", {"x": 1}),
     ],
 )
 def test_coerce_by_airtable_type_non_string_passthrough(
@@ -53,7 +53,7 @@ def test_coerce_by_airtable_type_non_string_passthrough(
     ("field_type", "raw"),
     [
         ("date", "not-a-date"),
-        ("dateTime", "not-a-datetime"),
+        ("date_time", "not-a-datetime"),
     ],
 )
 def test_coerce_by_airtable_type_invalid_string_passthrough(
@@ -90,7 +90,7 @@ def test_datetime_coercion_default_utc(monkeypatch: pytest.MonkeyPatch) -> None:
         mock_api_cls.return_value = mock_api
 
         connector = AirtableConnector(base_id="app123", table_name="tbl123")
-        out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00-04:00")
+        out = connector._coerce_by_airtable_type("date_time", "2026-07-22T12:00:00-04:00")
 
     assert isinstance(out, datetime)
     assert out.tzinfo is not None
@@ -108,7 +108,7 @@ def test_datetime_coercion_keep_mode(monkeypatch: pytest.MonkeyPatch) -> None:
         mock_api_cls.return_value = mock_api
 
         connector = AirtableConnector(base_id="app123", table_name="tbl123")
-        out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00-04:00")
+        out = connector._coerce_by_airtable_type("date_time", "2026-07-22T12:00:00-04:00")
 
     assert isinstance(out, datetime)
     assert out.utcoffset() == timedelta(hours=-4)
@@ -125,7 +125,7 @@ def test_datetime_coercion_local_mode(monkeypatch: pytest.MonkeyPatch) -> None:
         mock_api_cls.return_value = mock_api
 
         connector = AirtableConnector(base_id="app123", table_name="tbl123")
-        out = connector._coerce_by_airtable_type("dateTime", "2026-07-22T12:00:00Z")
+        out = connector._coerce_by_airtable_type("date_time", "2026-07-22T12:00:00Z")
 
     assert isinstance(out, datetime)
     # 12:00Z == 08:00 EDT in July
@@ -140,7 +140,7 @@ def test_normalize_record_applies_schema_typed_coercion(
     # deterministic schema map
     connector._field_types = {
         "DueDate": "date",
-        "EventAt": "dateTime",
+        "EventAt": "date_time",
         "Name": "single_line_text",
     }
 

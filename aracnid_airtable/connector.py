@@ -90,7 +90,7 @@ class AirtableConnector(BaseConnector):
         """
         field_name = str(raw or '').strip()
         if field_name.startswith('FieldType.'):
-            field_name = field_name.split('.', 1)[1]
+            field_name = field_name.split('.', 1)[1].lower()
         return field_name
 
 
@@ -120,7 +120,7 @@ class AirtableConnector(BaseConnector):
 
             # formula dateTimes cannot be determined from schema
             if result_type_raw == 'date':
-                result_type_raw = 'date/dateTime'
+                result_type_raw = 'date/date_time'
 
             result_type = self._normalize_field_type_name(result_type_raw)
 
@@ -182,8 +182,8 @@ class AirtableConnector(BaseConnector):
         if not isinstance(value, str):
             return value
 
-        # handle formula date/dateTime fields
-        if field_type == "date/dateTime":
+        # handle formula date/date_time fields
+        if field_type == "date/date_time":
             if self._looks_like_datetime_string(value):
                 try:
                     parsed = parse_iso_datetime(value)
@@ -204,7 +204,7 @@ class AirtableConnector(BaseConnector):
             except ValueError:
                 return value
 
-        if field_type == "dateTime":
+        if field_type == "date_time":
             if not isinstance(value, str):
                 return value
             try:
