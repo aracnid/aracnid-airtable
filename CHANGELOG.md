@@ -6,6 +6,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.3.5] - 2026-07-24
+
+### Changed
+
+- Coerced Airtable record `createdTime` into Python `datetime` during read normalization (`_created_time`).
+- Added coercion support for Airtable `last_modified_time` fields to Python `datetime`.
+
+### Tests
+
+- Updated functional tests to expect `_created_time` as a `datetime` (UTC-aware) instead of a raw string.
+- Added/updated integration coverage to verify coercion of:
+  - `_created_time` (from Airtable `createdTime`)
+  - last-modified datetime fields (e.g., `Updated` / `last_modified_time`)
+
+### Notes
+
+- Consumers previously treating `_created_time` as a string should now use datetime handling (or call `.isoformat()` if string output is needed).
+
 ## [v1.3.4] - 2026-07-23
 
 ### Changed
