@@ -9,6 +9,7 @@ Set the following environment variables to run these tests:
 """
 from collections.abc import Iterator
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 import os
 import uuid
 
@@ -578,3 +579,34 @@ def test_init_fails_for_local_mode_without_tz(monkeypatch):
     monkeypatch.delenv("ARACNID_LOCAL_TIMEZONE", raising=False)
     with pytest.raises(ValueError, match="ARACNID_LOCAL_TIMEZONE is required"):
         AirtableConnector("base_id", "table_name")
+
+
+def test_read_one_coerces_currency_field_to_python(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    created = connector.create_one(
+        {"Name": f"it-coerce-currency-{uuid.uuid4().hex[:8]}", "Currency": 123.45, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["Currency"], Decimal)
+    assert got["Currency"] == Decimal("123.45")
+
+
+def test_create_one_decimal_currency_field_roundtrip(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    d = Decimal('123.45')
+    created = connector.create_one(
+        {"Name": f"it-decimal-{uuid.uuid4().hex[:8]}", "Currency": d, "Status": "New"}
+    )
+    created_ids.append(created["id"])
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert isinstance(got["Currency"], Decimal)
+    assert got["Currency"] == d
+
+
