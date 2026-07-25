@@ -6,6 +6,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.4.0] - 2026-07-25
+
+### Added
+
+- Added `update_many(query, changes) -> int` to `AirtableConnector`.
+  - Supports query-driven bulk partial updates.
+  - Applies `changes` to all records matching `query`.
+  - Returns the number of updated records as an `int`.
+
+### Changed
+
+- Bulk updates now use Airtable batch update semantics internally (`pyairtable.batch_update` payload format).
+- `update_many` reuses existing write normalization logic for outbound field values.
+
+### Validation & Errors
+
+- `update_many` validates inputs:
+  - `query` must be a `dict`
+  - `changes` must be a non-empty `dict`
+- Connector-standard runtime error wrapping is applied for backend failures.
+
+### Notes
+
+- This release establishes count-based return semantics for bulk updates in `aracnid-airtable` (`int` affected rows).
+
 ## [v1.3.6] - 2026-07-24
 
 ### Changed
