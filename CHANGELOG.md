@@ -6,6 +6,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.5.0] - 2026-07-25
+
+### Added
+
+- Added `delete_many(query, hard=False) -> int` to `AirtableConnector`.
+  - Supports query-driven bulk deletion of Airtable records.
+  - Returns the number of records deleted as an integer count.
+
+### Behavior
+
+- `delete_many` resolves matching records from `query`, then performs batch deletion via Airtable.
+- If no records match, `delete_many` returns `0`.
+- Soft delete is not supported for Airtable:
+  - calling `delete_many(..., hard=False)` raises a runtime error (consistent with `delete_one` behavior).
+
+### Validation & Errors
+
+- Input validation added for:
+  - `query` must be a `dict`
+  - `hard` must be a `bool`
+- Backend failures are wrapped using connector-standard runtime error handling.
+
+### Tests
+
+- Added functional tests for:
+  - soft-delete rejection
+  - no-match return value
+  - query-to-batch-delete flow
+  - backend exception wrapping
+- Added integration tests for:
+  - deleting all matching records
+  - preserving non-matching records
+  - no-match behavior
+  - soft-delete rejection
+
 ## [v1.4.0] - 2026-07-25
 
 ### Added
