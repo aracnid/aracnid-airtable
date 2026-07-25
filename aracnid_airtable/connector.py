@@ -5,11 +5,11 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import os
 import re
-from typing import Any
+from typing import Any, cast
 
 
 from pyairtable import Api
-from pyairtable.api.types import RecordDict
+from pyairtable.api.types import RecordDict, UpdateRecordDict
 from pyairtable.formulas import AND, OR, NOT
 from pyairtable.formulas import BLANK, TRUE, FALSE
 from pyairtable.formulas import DATETIME_PARSE
@@ -78,6 +78,7 @@ class AirtableConnector(BaseConnector):
             "supports_soft_delete": False,
             "supports_hard_delete": True,
             "supports_transactions": False,
+            "supports_update_many": True,
         }
 
 
@@ -616,3 +617,47 @@ class AirtableConnector(BaseConnector):
             out.append(field if direction == 1 else f'-{field}')
 
         return out
+
+
+    def update_many(self, query: dict[str, Any], changes: dict[str, Any]) -> int:
+        if not isinstance(query, dict):
+            raise ValueError("query must be a dict")
+        if not isinstance(changes, dict):
+            raise ValueError("changes must be a dict")
+        if not changes:
+            raise ValueError("changes must not be empty")
+
+        normalized_changes = {
+            key: self._normalize_field_value_for_write(value)
+            for key, value in changes.items()
+        }
+
+        try:
+            matches = self.read_many(query)
+        except Exception as exc:
+            raise self._as_runtime_error(exc, "update_many") from exc
+
+        if not matches:
+            return 0
+
+        payload: list[UpdateRecordDict] = []
+        for rec in matches:
+            rid = rec.get("id") if isinstance(rec, dict) else None
+            if isinstance(rid, str) and rid:
+                item = cast(UpdateRecordDict, {"id": rid, "fields": normalized_changes})
+                payload.append(item)
+
+        if not payload:
+            return 0
+
+        updated_count = 0
+        batch_size = 10
+        try:
+            for i in range(0, len(payload), batch_size):
+                chunk: list[UpdateRecordDict] = payload[i:i + batch_size]
+                result = self.table.batch_update(chunk)
+                updated_count += len(result) if isinstance(result, list) else len(chunk)
+        except Exception as exc:
+            raise self._as_runtime_error(exc, "update_many") from exc
+
+        return updated_count

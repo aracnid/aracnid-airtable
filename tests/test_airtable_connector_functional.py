@@ -1,4 +1,4 @@
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -297,3 +297,64 @@ def test_local_mode_without_timezone_raises(monkeypatch):
     monkeypatch.delenv("ARACNID_LOCAL_TIMEZONE", raising=False)
     with pytest.raises(ValueError, match="ARACNID_LOCAL_TIMEZONE is required"):
         AirtableConnector(base_id="app123", table_name="tbl123")
+
+
+def test_update_many_builds_query_and_calls_batch_update(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+
+    # read_many phase (records matched by query)
+    table.all.return_value = [
+        {"id": "rec_1", "fields": {"Status": "New"}, "createdTime": "2026-07-15T00:00:00.000Z"},
+        {"id": "rec_2", "fields": {"Status": "New"}, "createdTime": "2026-07-15T00:00:00.000Z"},
+    ]
+
+    # batch_update response shape from pyairtable-style call
+    table.batch_update.return_value = [
+        {"id": "rec_1", "fields": {"Status": "Done"}, "createdTime": "2026-07-15T00:00:00.000Z"},
+        {"id": "rec_2", "fields": {"Status": "Done"}, "createdTime": "2026-07-15T00:00:00.000Z"},
+    ]
+
+    out = connector.update_many({"Status": "New"}, {"Status": "Done"})
+
+    # verify query path used
+    assert table.all.call_count == 1
+    _, all_kwargs = table.all.call_args
+    assert "formula" in all_kwargs
+    assert all_kwargs["formula"] is not None
+
+    # verify batch payload
+    table.batch_update.assert_called_once_with(
+        [
+            {"id": "rec_1", "fields": {"Status": "Done"}},
+            {"id": "rec_2", "fields": {"Status": "Done"}},
+        ]
+    )
+
+    # if connector returns count
+    assert out == 2
+
+
+def test_update_many_no_matches_returns_zero_and_skips_batch_update(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = []
+
+    out = connector.update_many({"Status": "Missing"}, {"Status": "Done"})
+
+    assert out == 0
+    table.batch_update.assert_not_called()
+
+
+def test_update_many_rejects_empty_changes(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+
+    with pytest.raises(ValueError):
+        connector.update_many({"Status": "New"}, {})
+
+    table.all.assert_not_called()
+    table.batch_update.assert_not_called()

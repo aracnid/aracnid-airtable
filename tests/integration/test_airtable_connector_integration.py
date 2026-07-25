@@ -610,3 +610,62 @@ def test_create_one_decimal_currency_field_roundtrip(
     assert got["Currency"] == d
 
 
+def test_update_many_updates_all_matching_records(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    token = f"it-upmany-{uuid.uuid4().hex[:8]}"
+
+    a = connector.create_one({"Name": f"{token}-a", "Tag": token, "Status": "New"})
+    b = connector.create_one({"Name": f"{token}-b", "Tag": token, "Status": "New"})
+    c = connector.create_one({"Name": f"{token}-c", "Tag": token, "Status": "Active"})  # non-match
+
+    created_ids.extend([a["id"], b["id"], c["id"]])
+
+    affected = connector.update_many(
+        {"$and": [{"Tag": {"$eq": token}}, {"Status": {"$eq": "New"}}]},
+        {"Status": "Done"},
+    )
+    assert affected == 2
+
+    rows = connector.read_many({"Tag": token})
+    by_id = {r["id"]: r for r in rows}
+
+    assert by_id[a["id"]]["Status"] == "Done"
+    assert by_id[b["id"]]["Status"] == "Done"
+    assert by_id[c["id"]]["Status"] == "Active"
+
+
+def test_update_many_no_matches_returns_zero(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    token = f"it-upmany-{uuid.uuid4().hex[:8]}"
+    created = connector.create_one({"Name": f"{token}-only", "Tag": token, "Status": "Active"})
+    created_ids.append(created["id"])
+
+    affected = connector.update_many(
+        {"$and": [{"Tag": {"$eq": token}}, {"Status": {"$eq": "Missing"}}]},
+        {"Status": "Done"},
+    )
+    assert affected == 0
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert got["Status"] == "Active"
+
+
+def test_update_many_applies_partial_update_only(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    token = f"it-upmany-{uuid.uuid4().hex[:8]}"
+    created = connector.create_one(
+        {"Name": f"{token}-x", "Tag": token, "Status": "New", "Priority": 1}
+    )
+    created_ids.append(created["id"])
+
+    affected = connector.update_many({"Tag": token}, {"Priority": 2})
+    assert affected == 1
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert got["Priority"] == 2
+    assert got["Status"] == "New"
