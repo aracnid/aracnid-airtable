@@ -669,3 +669,58 @@ def test_update_many_applies_partial_update_only(
     assert got is not None
     assert got["Priority"] == 2
     assert got["Status"] == "New"
+
+
+def test_delete_many_deletes_all_matching_records(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    token = f"it-delmany-{uuid.uuid4().hex[:8]}"
+
+    a = connector.create_one({"Name": f"{token}-a", "Tag": token, "Status": "Inactive"})
+    b = connector.create_one({"Name": f"{token}-b", "Tag": token, "Status": "Inactive"})
+    c = connector.create_one({"Name": f"{token}-c", "Tag": token, "Status": "Active"})  # non-match
+
+    created_ids.extend([a["id"], b["id"], c["id"]])
+
+    deleted = connector.delete_many(
+        {"$and": [{"Tag": {"$eq": token}}, {"Status": {"$eq": "Inactive"}}]},
+        hard=True,
+    )
+    assert deleted == 2
+
+    # Prevent fixture cleanup from attempting to delete already-deleted records.
+    created_ids.remove(a["id"])
+    created_ids.remove(b["id"])
+
+    assert connector.read_one(a["id"]) is None
+    assert connector.read_one(b["id"]) is None
+
+    survivor = connector.read_one(c["id"])
+    assert survivor is not None
+    assert survivor["Status"] == "Active"
+
+
+def test_delete_many_no_matches_returns_zero(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    token = f"it-delmany-{uuid.uuid4().hex[:8]}"
+    created = connector.create_one({"Name": f"{token}-only", "Tag": token, "Status": "Active"})
+    created_ids.append(created["id"])
+
+    deleted = connector.delete_many(
+        {"$and": [{"Tag": {"$eq": token}}, {"Status": {"$eq": "Missing"}}]},
+        hard=True,
+    )
+    assert deleted == 0
+
+    got = connector.read_one(created["id"])
+    assert got is not None
+    assert got["Status"] == "Active"
+
+
+def test_delete_many_hard_false_raises_runtimeerror(
+    connector: AirtableConnector,
+) -> None:
+    with pytest.raises(RuntimeError, match="soft delete is not supported"):
+        connector.delete_many({"Status": "Inactive"}, hard=False)
+        

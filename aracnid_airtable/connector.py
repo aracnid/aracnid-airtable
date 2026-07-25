@@ -79,6 +79,7 @@ class AirtableConnector(BaseConnector):
             "supports_hard_delete": True,
             "supports_transactions": False,
             "supports_update_many": True,
+            "supports_delete_many": True,
         }
 
 
@@ -661,3 +662,70 @@ class AirtableConnector(BaseConnector):
             raise self._as_runtime_error(exc, "update_many") from exc
 
         return updated_count
+
+
+    def delete_many(self, query: dict[str, Any], hard: bool = False) -> int:
+        """Delete records matching query.
+
+        Args:
+            query (dict[str, Any]): Query DSL filter used to select records.
+            hard (bool): Whether to perform hard delete. Must be True for Airtable.
+
+        Returns:
+            int: Number of records deleted.
+
+        Raises:
+            ValueError: If query is not a dict or hard is not a bool.
+            RuntimeError: If soft delete is requested or backend operations fail.
+        """
+        if not isinstance(query, dict):
+            raise ValueError("query must be a dict")
+        if not isinstance(hard, bool):
+            raise ValueError("hard must be a bool")
+
+        # Airtable connector supports hard delete only.
+        if not hard:
+            raise RuntimeError(
+                "delete_many failed: soft delete is not supported; pass hard=True"
+            )
+
+        try:
+            matches = self.read_many(query)
+        except Exception as exc:
+            raise self._as_runtime_error(exc, "delete_many") from exc
+
+        if not matches:
+            return 0
+
+        record_ids: list[str] = []
+        for rec in matches:
+            rid = rec.get("id") if isinstance(rec, dict) else None
+            if isinstance(rid, str) and rid:
+                record_ids.append(rid)
+
+        if not record_ids:
+            return 0
+
+        deleted_count = 0
+        try:
+            # Keep explicit chunking for deterministic behavior, mirroring update_many.
+            batch_size = 10
+            for i in range(0, len(record_ids), batch_size):
+                chunk = record_ids[i:i + batch_size]
+                result = self.table.batch_delete(chunk)
+
+                if isinstance(result, list):
+                    # Typical shape: [{"id": "...", "deleted": True}, ...]
+                    deleted_count += sum(
+                        1
+                        for item in result
+                        if isinstance(item, dict) and bool(item.get("deleted"))
+                    )
+                else:
+                    # Defensive fallback if backend shape differs.
+                    deleted_count += len(chunk)
+
+        except Exception as exc:
+            raise self._as_runtime_error(exc, "delete_many") from exc
+
+        return deleted_count
