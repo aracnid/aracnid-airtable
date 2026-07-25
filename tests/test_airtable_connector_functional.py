@@ -358,3 +358,65 @@ def test_update_many_rejects_empty_changes(
 
     table.all.assert_not_called()
     table.batch_update.assert_not_called()
+
+
+def test_delete_many_hard_false_raises_runtimeerror(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+
+    with pytest.raises(RuntimeError, match="soft delete is not supported"):
+        connector.delete_many({"status": "inactive"}, hard=False)
+
+    table.all.assert_not_called()
+    table.batch_delete.assert_not_called()
+
+
+def test_delete_many_no_matches_returns_zero_and_skips_batch_delete(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = []
+
+    out = connector.delete_many({"status": "inactive"}, hard=True)
+
+    assert out == 0
+    table.batch_delete.assert_not_called()
+
+
+def test_delete_many_builds_query_and_calls_batch_delete(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = [
+        {"id": "rec_1", "fields": {"status": "inactive"}, "createdTime": "t1"},
+        {"id": "rec_2", "fields": {"status": "inactive"}, "createdTime": "t2"},
+    ]
+    table.batch_delete.return_value = [
+        {"id": "rec_1", "deleted": True},
+        {"id": "rec_2", "deleted": True},
+    ]
+
+    out = connector.delete_many({"status": "inactive"}, hard=True)
+
+    assert table.all.call_count == 1
+    _, kwargs = table.all.call_args
+    assert "formula" in kwargs
+    assert kwargs["formula"] is not None
+
+    table.batch_delete.assert_called_once_with(["rec_1", "rec_2"])
+    assert out == 2
+
+
+def test_delete_many_backend_exceptions_wrapped_as_runtimeerror(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, table = connector_and_table
+    table.all.return_value = [
+        {"id": "rec_1", "fields": {"status": "inactive"}, "createdTime": "t1"},
+    ]
+    table.batch_delete.side_effect = Exception("boom")
+
+    with pytest.raises(RuntimeError, match=r"^delete_many failed:"):
+        connector.delete_many({"status": "inactive"}, hard=True)
+
