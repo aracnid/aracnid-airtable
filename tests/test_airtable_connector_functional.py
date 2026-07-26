@@ -194,6 +194,54 @@ def test_query_to_formula_unsupported_operator_raises(
         connector._query_to_formula({"name": {"$wat": 1}})
 
 
+def test_query_to_formula_regex_invalid_pattern_raises(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+
+    with pytest.raises(RuntimeError, match=r"invalid '\$regex' pattern"):
+        connector._query_to_formula({"name": {"$regex": "("}})
+
+
+def test_query_to_formula_regex_requires_string_field_when_known(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+    connector._field_types = {"age": "number"}
+
+    with pytest.raises(RuntimeError, match=r"requires a string field"):
+        connector._query_to_formula({"age": {"$regex": "^1"}})
+
+
+def test_query_to_formula_regex_rejects_unsupported_options(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+
+    with pytest.raises(RuntimeError, match=r"unsupported '\$options' flags"):
+        connector._query_to_formula({"name": {"$regex": "^a", "$options": "m"}})
+
+
+def test_query_to_formula_regex_rejects_excessive_pattern_length(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+    long_pattern = "a" * 257
+
+    with pytest.raises(RuntimeError, match=r"pattern exceeds max length"):
+        connector._query_to_formula({"name": {"$regex": long_pattern}})
+
+
+def test_query_to_formula_regex_rejects_excessive_pattern_complexity(
+    connector_and_table: tuple[AirtableConnector, MagicMock],
+) -> None:
+    connector, _ = connector_and_table
+    complex_pattern = "|".join("a" for _ in range(70))
+
+    with pytest.raises(RuntimeError, match=r"pattern exceeds complexity policy"):
+        connector._query_to_formula({"name": {"$regex": complex_pattern}})
+
+
 def test_sort_to_airtable_sort_none_or_empty_returns_none(
     connector_and_table: tuple[AirtableConnector, MagicMock],
 ) -> None:

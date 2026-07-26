@@ -27,6 +27,22 @@ ISO_LIKE_DATETIME_RE = re.compile(
     r"(?:Z|[+-]\d{2}:\d{2})?$"
 )
 _CURRENCY_QUANT = Decimal("0.01")
+_REGEX_MAX_PATTERN_LENGTH = 256
+_REGEX_MAX_META_TOKENS = 64
+_REGEX_ALLOWED_OPTIONS = {"i"}
+_REGEX_STRING_FIELD_TYPES = {
+    "singlelinetext",
+    "single_line_text",
+    "multilinetext",
+    "multi_line_text",
+    "multiline_text",
+    "richtext",
+    "rich_text",
+    "email",
+    "url",
+    "phonenumber",
+    "phone_number",
+}
 
 class AirtableConnector(BaseConnector):
     """A connector for Airtable using the pyairtable library.
@@ -590,13 +606,57 @@ class AirtableConnector(BaseConnector):
         else:
             raise RuntimeError("read_many failed: '$regex' value must be a string")
 
+        self._validate_regex_field_is_string(field)
+        self._validate_regex_pattern(pattern_str)
+
         if options is not None:
             if not isinstance(options, str):
                 raise RuntimeError("read_many failed: '$options' value must be a string")
+            invalid_options = sorted({opt for opt in options if opt not in _REGEX_ALLOWED_OPTIONS})
+            if invalid_options:
+                bad = "".join(invalid_options)
+                raise RuntimeError(
+                    f"read_many failed: unsupported '$options' flags '{bad}'"
+                )
             if "i" in options and not pattern_str.startswith("(?i)"):
                 pattern_str = f"(?i){pattern_str}"
 
         return REGEX_MATCH(Field(field), self._literal(pattern_str))
+
+
+    def _validate_regex_field_is_string(self, field: str) -> None:
+        """Ensure $regex targets a known string field when metadata is available."""
+        field_types = self._load_field_types()
+        field_type = field_types.get(field)
+        if not field_type:
+            return
+
+        if str(field_type).strip().lower() not in _REGEX_STRING_FIELD_TYPES:
+            raise RuntimeError(
+                f"read_many failed: '$regex' requires a string field; '{field}' is '{field_type}'"
+            )
+
+
+    def _validate_regex_pattern(self, pattern: str) -> None:
+        """Validate regex pattern shape and complexity bounds."""
+        if len(pattern) > _REGEX_MAX_PATTERN_LENGTH:
+            raise RuntimeError(
+                "read_many failed: '$regex' pattern exceeds max length "
+                f"({_REGEX_MAX_PATTERN_LENGTH})"
+            )
+
+        meta_tokens = len(re.findall(r"[.*+?{}\[\]()|\\]", pattern))
+        if meta_tokens > _REGEX_MAX_META_TOKENS:
+            raise RuntimeError(
+                "read_many failed: '$regex' pattern exceeds complexity policy"
+            )
+
+        try:
+            re.compile(pattern)
+        except re.error as exc:
+            raise RuntimeError(
+                f"read_many failed: invalid '$regex' pattern: {exc}"
+            ) from exc
 
 
     def _literal(self, value: Any) -> str | int | float | Formula:
