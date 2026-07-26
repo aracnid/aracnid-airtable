@@ -6,6 +6,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.6.0] - 2026-07-26
+
+### Added
+
+- Added Query DSL `$regex` support in `read_many()` formula translation.
+- Added support for regex `$options` in Query DSL (currently `i` for case-insensitive matching).
+
+### Validation & Errors
+
+- Added connector-level regex guardrails for untrusted query inputs:
+  - invalid regex patterns are rejected with clear runtime errors,
+  - non-string-field regex usage is rejected when Airtable field metadata is available,
+  - regex options are explicitly validated (only `i` is supported),
+  - max regex pattern length policy is enforced,
+  - regex meta-token complexity policy is enforced.
+
+### Tests
+
+- Added functional converter coverage for:
+  - `$regex` pattern translation to `REGEX_MATCH(...)`
+  - `$regex` + `$options: "i"` case-insensitive translation
+  - invalid regex pattern rejection
+  - non-string field regex rejection
+  - unsupported `$options` rejection
+  - excessive pattern length rejection
+  - excessive pattern complexity rejection
+- Added integration coverage to verify:
+  - anchored prefix regex matching
+  - case-insensitive regex matching with `$options: "i"`
+
 ## [v1.5.0] - 2026-07-25
 
 ### Added
