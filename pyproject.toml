@@ -14,7 +14,7 @@ Repository = "https://github.com/<owner>/aracnid-airtable"
 
 [tool.poetry.dependencies]
 python = "^3.12"
-aracnid-core = "1.4.0"
+aracnid-core = "1.5.0"
 pyairtable = "^3.4.0"
 
 [tool.poetry.group.dev.dependencies]
