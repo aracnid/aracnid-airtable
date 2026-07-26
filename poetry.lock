@@ -14,14 +14,14 @@ files = [
 
 [[package]]
 name = "aracnid-core"
-version = "1.4.0"
+version = "1.5.0"
 description = "Base interfaces for Aracnid integration connectors"
 optional = false
 python-versions = "<4.0,>=3.10"
 groups = ["main"]
 files = [
-    {file = "aracnid_core-1.4.0-py3-none-any.whl", hash = "sha256:0411749971df639f6f01d9fdab0da8dfa13ec0d422e9b6cb722fe32eb7b4cdfc"},
-    {file = "aracnid_core-1.4.0.tar.gz", hash = "sha256:105b202bb345a6edd27faae601a0216e4533effa712f7cfb16e11ccaed4be4ae"},
+    {file = "aracnid_core-1.5.0-py3-none-any.whl", hash = "sha256:78093379b9c429d29b13d395d1beed18d6d429099dc74e848e8c947d41aef490"},
+    {file = "aracnid_core-1.5.0.tar.gz", hash = "sha256:4f231bc210b9557c377dbd57aaeefd26392dc6940601b818d444776e3280dc98"},
 ]
 
 [[package]]
@@ -1244,4 +1244,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "4bd5f4d75bbbec5b54f8ccc1816fc4d7bad72c910c7c1014f6adc46bf0f1b4a2"
+content-hash = "4c15f1a14786a9da16c79ec599635e77a74aa245a10068645fd5b68be0d87ebb"

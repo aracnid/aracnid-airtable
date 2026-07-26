@@ -167,6 +167,8 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
         ({"name": {"$exists": False}}, ["{name}=BLANK()"]),
         ({"name": {"$contains": "ph"}}, ["FIND"]),
         ({"name": {"$startsWith": "al"}}, ["LEFT", "LEN"]),
+        ({"name": {"$regex": "^al"}}, ["REGEX_MATCH", "^al"]),
+        ({"name": {"$regex": "^AL", "$options": "i"}}, ["REGEX_MATCH", "(?i)^AL"]),
     ],
 )
 def test_query_to_formula_matrix(

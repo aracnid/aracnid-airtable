@@ -14,7 +14,7 @@ from pyairtable.formulas import AND, OR, NOT
 from pyairtable.formulas import BLANK, TRUE, FALSE
 from pyairtable.formulas import DATETIME_PARSE
 from pyairtable.formulas import EQ, NE, GT, GTE, LT, LTE
-from pyairtable.formulas import FIND, LEFT, LEN
+from pyairtable.formulas import FIND, LEFT, LEN, REGEX_MATCH
 from pyairtable.formulas import Field, Formula
 from aracnid_core.base import BaseConnector
 from aracnid_core.query_dsl import QueryDict, SortSpec
@@ -539,7 +539,10 @@ class AirtableConnector(BaseConnector):
         """
         # condition is normalized op-object
         parts: list[Any] = []
+        regex_options = condition.get("$options")
         for op, value in condition.items():
+            if op == "$options":
+                continue
             if op == "$eq":
                 parts.append(EQ(Field(field), self._literal(value)))
             elif op == "$ne":
@@ -562,12 +565,38 @@ class AirtableConnector(BaseConnector):
                 parts.append(GT(FIND(self._literal(value), Field(field)), 0))
             elif op == "$startsWith":
                 parts.append(EQ(LEFT(Field(field), LEN(self._literal(value))), self._literal(value)))
+            elif op == "$regex":
+                parts.append(self._regex_condition_to_formula(field, value, regex_options))
             else:
                 raise RuntimeError(f"read_many failed: unsupported operator '{op}'")
 
         if len(parts) == 1:
             return parts[0]
         return AND(*parts)
+
+
+    def _regex_condition_to_formula(
+        self, field: str, pattern: Any, options: Any | None
+    ) -> Formula:
+        """Convert a regex condition to Airtable's REGEX_MATCH formula.
+
+        Airtable regex options are represented inline via regex flags such as
+        ``(?i)`` for case-insensitive matching.
+        """
+        if isinstance(pattern, re.Pattern):
+            pattern_str = pattern.pattern
+        elif isinstance(pattern, str):
+            pattern_str = pattern
+        else:
+            raise RuntimeError("read_many failed: '$regex' value must be a string")
+
+        if options is not None:
+            if not isinstance(options, str):
+                raise RuntimeError("read_many failed: '$options' value must be a string")
+            if "i" in options and not pattern_str.startswith("(?i)"):
+                pattern_str = f"(?i){pattern_str}"
+
+        return REGEX_MATCH(Field(field), self._literal(pattern_str))
 
 
     def _literal(self, value: Any) -> str | int | float | Formula:

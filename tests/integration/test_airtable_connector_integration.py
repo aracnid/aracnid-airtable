@@ -13,7 +13,6 @@ from decimal import Decimal
 import os
 import uuid
 
-from aracnid_core.exceptions import QueryValidationError
 import pytest
 
 from aracnid_airtable.connector import AirtableConnector
@@ -319,11 +318,23 @@ def test_read_many_query_dsl_integration_matrix(connector, seeded_records):
     assert _ids(out_contains_quote) == {recs["quote"]["id"]}
 
 
-def test_read_many_query_dsl_unsupported_operator_raises(connector):
-    query = {"Name": {"$regex": "^alp"}}
+def test_read_many_query_dsl_regex_matches_expected_records(connector, seeded_records):
+    tag, recs = seeded_records
 
-    with pytest.raises(QueryValidationError, match=r"unsupported field operator '\$regex'"):
-        connector.read_many(query)
+    out_prefix = connector.read_many(
+        {"$and": [{"Tag": {"$eq": tag}}, {"Name": {"$regex": "^alp"}}]}
+    )
+    assert _ids(out_prefix) == {recs["r1"]["id"]}
+
+    out_case_insensitive = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"Name": {"$regex": "^ALP", "$options": "i"}},
+            ]
+        }
+    )
+    assert _ids(out_case_insensitive) == {recs["r1"]["id"]}
 
 
 def test_create_one_naive_datetime_raises_valueerror(connector: AirtableConnector) -> None:
