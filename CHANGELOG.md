@@ -6,6 +6,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.6.1] - 2026-07-30
+
+### Changed
+
+- Bumped `aracnid-core` dependency from `1.5.0` to `1.5.1`.
+
+### Core Query DSL Semantics (via `aracnid-core` v1.5.1)
+
+- Empty predicate `{}` is now accepted as logical TRUE when used under `$and` / `$or`.
+- Logical identity normalization is now applied, including:
+  - `{"$and": [{}, P]}` -> `P`
+  - `{"$and": [{}, {}]}` -> `{}`
+  - `{"$or": [P, {}]}` -> `{}`
+- Strict invalid cases are unchanged:
+  - `{"$not": {}}` remains invalid
+  - empty field operator objects like `{"field": {}}` remain invalid
+- Query DSL documentation and core contract tests were updated to reflect this behavior.
+
+### Compatibility
+
+- No connector API changes in this package; behavior updates come from shared core semantics in `aracnid-core`.
+
 ## [v1.6.0] - 2026-07-26
 
 ### Added
