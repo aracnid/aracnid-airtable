@@ -14,7 +14,7 @@ from pyairtable.formulas import AND, OR, NOT
 from pyairtable.formulas import BLANK, TRUE, FALSE
 from pyairtable.formulas import DATETIME_PARSE
 from pyairtable.formulas import EQ, NE, GT, GTE, LT, LTE
-from pyairtable.formulas import FIND, LEFT, LEN, REGEX_MATCH
+from pyairtable.formulas import COUNTA, FIND, LEFT, LEN, REGEX_MATCH
 from pyairtable.formulas import Field, Formula
 from aracnid_core.base import BaseConnector
 from aracnid_core.query_dsl import QueryDict, SortSpec
@@ -560,9 +560,15 @@ class AirtableConnector(BaseConnector):
             if op == "$options":
                 continue
             if op == "$eq":
-                parts.append(EQ(Field(field), self._literal(value)))
+                if value is None:
+                    parts.append(EQ(COUNTA(Field(field)), 0))
+                else:
+                    parts.append(EQ(Field(field), self._literal(value)))
             elif op == "$ne":
-                parts.append(NE(Field(field), self._literal(value)))
+                if value is None:
+                    parts.append(NE(COUNTA(Field(field)), 0))
+                else:
+                    parts.append(NE(Field(field), self._literal(value)))
             elif op == "$gt":
                 parts.append(GT(Field(field), self._literal(value)))
             elif op == "$gte":
@@ -572,11 +578,23 @@ class AirtableConnector(BaseConnector):
             elif op == "$lte":
                 parts.append(LTE(Field(field), self._literal(value)))
             elif op == "$in":
-                parts.append(OR(*(EQ(Field(field), self._literal(v)) for v in value)))
+                in_parts: list[Any] = []
+                for v in value:
+                    if v is None:
+                        in_parts.append(EQ(COUNTA(Field(field)), 0))
+                    else:
+                        in_parts.append(EQ(Field(field), self._literal(v)))
+                parts.append(OR(*in_parts))
             elif op == "$nin":
-                parts.append(AND(*(NE(Field(field), self._literal(v)) for v in value)))
+                nin_parts: list[Any] = []
+                for v in value:
+                    if v is None:
+                        nin_parts.append(NE(COUNTA(Field(field)), 0))
+                    else:
+                        nin_parts.append(NE(Field(field), self._literal(v)))
+                parts.append(AND(*nin_parts))
             elif op == "$exists":
-                parts.append(NOT(EQ(Field(field), BLANK())) if value else EQ(Field(field), BLANK()))
+                parts.append(NE(COUNTA(Field(field)), 0) if value else EQ(COUNTA(Field(field)), 0))
             elif op == "$contains":
                 parts.append(GT(FIND(self._literal(value), Field(field)), 0))
             elif op == "$startsWith":

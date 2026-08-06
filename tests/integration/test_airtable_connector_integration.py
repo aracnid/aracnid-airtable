@@ -318,6 +318,134 @@ def test_read_many_query_dsl_integration_matrix(connector, seeded_records):
     assert _ids(out_contains_quote) == {recs["quote"]["id"]}
 
 
+def test_read_many_ne_none_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-ne-none-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    created_ids.extend([zero["id"], blank["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$ne": None}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {zero["id"]}
+
+
+def test_read_many_exists_true_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-exists-true-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    created_ids.extend([zero["id"], blank["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$exists": True}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {zero["id"]}
+
+
+def test_read_many_exists_false_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-exists-false-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    created_ids.extend([zero["id"], blank["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$exists": False}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {blank["id"]}
+
+
+def test_read_many_eq_none_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-eq-none-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    created_ids.extend([zero["id"], blank["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$eq": None}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {blank["id"]}
+
+
+def test_read_many_in_with_none_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-in-none-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    one = connector.create_one({"Name": "one", "Tag": tag, "CountInt": 1})
+    created_ids.extend([zero["id"], blank["id"], one["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$in": [None, 1]}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {blank["id"], one["id"]}
+
+
+def test_read_many_nin_with_none_treats_zero_as_set(
+    connector: AirtableConnector, created_ids: list[str]
+) -> None:
+    tag = f"it-nin-none-{uuid.uuid4().hex[:8]}"
+
+    zero = connector.create_one({"Name": "zero", "Tag": tag, "CountInt": 0})
+    blank = connector.create_one({"Name": "blank", "Tag": tag})
+    one = connector.create_one({"Name": "one", "Tag": tag, "CountInt": 1})
+    created_ids.extend([zero["id"], blank["id"], one["id"]])
+
+    rows = connector.read_many(
+        {
+            "$and": [
+                {"Tag": {"$eq": tag}},
+                {"CountInt": {"$nin": [None, 1]}},
+            ]
+        }
+    )
+
+    assert _ids(rows) == {zero["id"]}
+
+
 def test_read_many_query_dsl_regex_matches_expected_records(connector, seeded_records):
     tag, recs = seeded_records
 
