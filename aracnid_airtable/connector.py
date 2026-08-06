@@ -560,7 +560,10 @@ class AirtableConnector(BaseConnector):
             if op == "$options":
                 continue
             if op == "$eq":
-                parts.append(EQ(Field(field), self._literal(value)))
+                if value is None:
+                    parts.append(EQ(COUNTA(Field(field)), 0))
+                else:
+                    parts.append(EQ(Field(field), self._literal(value)))
             elif op == "$ne":
                 if value is None:
                     parts.append(NE(COUNTA(Field(field)), 0))
@@ -575,9 +578,21 @@ class AirtableConnector(BaseConnector):
             elif op == "$lte":
                 parts.append(LTE(Field(field), self._literal(value)))
             elif op == "$in":
-                parts.append(OR(*(EQ(Field(field), self._literal(v)) for v in value)))
+                in_parts: list[Any] = []
+                for v in value:
+                    if v is None:
+                        in_parts.append(EQ(COUNTA(Field(field)), 0))
+                    else:
+                        in_parts.append(EQ(Field(field), self._literal(v)))
+                parts.append(OR(*in_parts))
             elif op == "$nin":
-                parts.append(AND(*(NE(Field(field), self._literal(v)) for v in value)))
+                nin_parts: list[Any] = []
+                for v in value:
+                    if v is None:
+                        nin_parts.append(NE(COUNTA(Field(field)), 0))
+                    else:
+                        nin_parts.append(NE(Field(field), self._literal(v)))
+                parts.append(AND(*nin_parts))
             elif op == "$exists":
                 parts.append(NE(COUNTA(Field(field)), 0) if value else EQ(COUNTA(Field(field)), 0))
             elif op == "$contains":

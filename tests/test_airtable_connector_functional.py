@@ -153,6 +153,7 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
     ("query", "expected_parts"),
     [
         ({"name": {"$eq": "alpha"}}, ["{name}", "alpha"]),
+        ({"name": {"$eq": None}}, ["COUNTA({name})=0"]),
         ({"name": {"$ne": "alpha"}}, ["{name}", "!="]),
         ({"name": {"$ne": None}}, ["COUNTA({name})!=0"]),
         ({"age": {"$gt": 18}}, ["{age}", ">", "18"]),
@@ -163,7 +164,9 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
         ({"$or": [{"name": {"$eq": "a"}}, {"name": {"$eq": "b"}}]}, ["OR"]),
         ({"$not": {"name": {"$eq": "a"}}}, ["NOT"]),
         ({"name": {"$in": ["a", "b"]}}, ["OR"]),
+        ({"name": {"$in": [None, "b"]}}, ["OR", "COUNTA({name})=0", "{name}='b'"]),
         ({"name": {"$nin": ["a", "b"]}}, ["AND"]),
+        ({"name": {"$nin": [None, "b"]}}, ["AND", "COUNTA({name})!=0", "{name}!='b'"]),
         ({"name": {"$exists": True}}, ["COUNTA({name})!=0"]),
         ({"name": {"$exists": False}}, ["COUNTA({name})=0"]),
         ({"name": {"$contains": "ph"}}, ["FIND"]),
