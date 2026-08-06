@@ -154,6 +154,7 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
     [
         ({"name": {"$eq": "alpha"}}, ["{name}", "alpha"]),
         ({"name": {"$ne": "alpha"}}, ["{name}", "!="]),
+        ({"name": {"$ne": None}}, ["COUNTA({name})!=0"]),
         ({"age": {"$gt": 18}}, ["{age}", ">", "18"]),
         ({"age": {"$gte": 18}}, ["{age}", ">=", "18"]),
         ({"age": {"$lt": 65}}, ["{age}", "<", "65"]),
@@ -163,8 +164,8 @@ def test_backend_exceptions_wrapped_as_runtimeerror(
         ({"$not": {"name": {"$eq": "a"}}}, ["NOT"]),
         ({"name": {"$in": ["a", "b"]}}, ["OR"]),
         ({"name": {"$nin": ["a", "b"]}}, ["AND"]),
-        ({"name": {"$exists": True}}, ["NOT({name}=BLANK())"]),
-        ({"name": {"$exists": False}}, ["{name}=BLANK()"]),
+        ({"name": {"$exists": True}}, ["COUNTA({name})!=0"]),
+        ({"name": {"$exists": False}}, ["COUNTA({name})=0"]),
         ({"name": {"$contains": "ph"}}, ["FIND"]),
         ({"name": {"$startsWith": "al"}}, ["LEFT", "LEN"]),
         ({"name": {"$regex": "^al"}}, ["REGEX_MATCH", "^al"]),
