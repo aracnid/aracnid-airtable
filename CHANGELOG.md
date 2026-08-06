@@ -6,6 +6,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.6.2] - 2026-08-06
+
+### Fixed
+
+- Corrected Query DSL null/presence translation for Airtable so numeric `0` is treated as a set value (not blank).
+- Replaced `BLANK()`-based presence checks with `COUNTA(...)`-based checks where appropriate.
+
+### Changed
+
+- Aligned value-presence semantics across operators:
+  - `{"field": {"$exists": True}}` -> `COUNTA({field})!=0`
+  - `{"field": {"$exists": False}}` -> `COUNTA({field})=0`
+  - `{"field": {"$ne": None}}` -> `COUNTA({field})!=0`
+  - `{"field": {"$eq": None}}` -> `COUNTA({field})=0`
+- Added `None`-aware handling in list operators:
+  - `$in` treats `None` entries as blank checks (`COUNTA({field})=0`)
+  - `$nin` treats `None` entries as non-blank checks (`COUNTA({field})!=0`)
+
+### Tests
+
+- Updated functional query-to-formula matrix coverage for:
+  - `$eq: None`
+  - `$ne: None`
+  - `$exists: true/false`
+  - `$in`/`$nin` containing `None`
+- Added integration coverage validating blank-vs-zero behavior against Airtable API for:
+  - `$ne: None`
+  - `$eq: None`
+  - `$exists: true`
+  - `$exists: false`
+  - `$in` with `None`
+  - `$nin` with `None`
+
 ## [v1.6.1] - 2026-07-30
 
 ### Changed
