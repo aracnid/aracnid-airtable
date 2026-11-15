@@ -8,16 +8,18 @@ import re
 from typing import Any, cast
 
 
-from pyairtable import Api
+from pyairtable import Api, retry_strategy
 from pyairtable.api.types import RecordDict, UpdateRecordDict
 from pyairtable.formulas import AND, OR, NOT
 from pyairtable.formulas import BLANK, TRUE, FALSE
 from pyairtable.formulas import DATETIME_PARSE
 from pyairtable.formulas import EQ, NE, GT, GTE, LT, LTE
-from pyairtable.formulas import COUNTA, FIND, LEFT, LEN, REGEX_MATCH
+from pyairtable.formulas import COUNTA, FIND, LEFT, LEN, RECORD_ID, REGEX_MATCH
 from pyairtable.formulas import Field, Formula
+from requests.exceptions import ConnectTimeout, HTTPError
 from aracnid_core.base import BaseConnector
 from aracnid_core.query_dsl import QueryDict, SortSpec
+from aracnid_core import RecordNotFoundError, WriteOutcomeUnknownError, WriteRejectedError
 from aracnid_core import coerce_datetime_timezone, parse_iso_datetime, load_datetime_tz_config_from_env
 
 
@@ -70,7 +72,11 @@ class AirtableConnector(BaseConnector):
         self.base_id = base_id.strip()
         self.table_name = table_name.strip()
 
-        self.api = Api(self.air_api_key)
+        # Leave replay of writes to the caller, which can reconcile the outcome.
+        self.api = Api(
+            self.air_api_key,
+            retry_strategy=retry_strategy(allowed_methods={"GET", "HEAD"}, other=0),
+        )
         self.base = self.api.base(self.base_id)
         self.table = self.base.table(self.table_name)
 
@@ -296,6 +302,49 @@ class AirtableConnector(BaseConnector):
         return "404" in msg or "not found" in msg
 
 
+    def _write_status(self, exc: Exception) -> int | None:
+        if isinstance(exc, HTTPError) and exc.response is not None:
+            return exc.response.status_code
+        return None
+
+
+    def _delete_target_is_missing(self, exc: Exception, record_id: str) -> bool:
+        if not isinstance(exc, HTTPError) or exc.response is None:
+            return False
+        if exc.response.status_code == 404:
+            return True
+        if exc.response.status_code != 403:
+            return False
+
+        try:
+            payload = exc.response.json()
+        except ValueError:
+            return False
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if not isinstance(error, dict) or error.get("type") != "INVALID_PERMISSIONS_OR_MODEL_NOT_FOUND":
+            return False
+
+        # A record-by-ID GET can return the same ambiguous 403.
+        # A successful filtered list can distinguish absence from denied access.
+        try:
+            return self.table.first(formula=EQ(RECORD_ID(), record_id)) is None
+        except Exception:
+            return False
+
+
+    def _as_write_error(
+        self, exc: Exception, op: str, record_id: str | None = None
+    ) -> RuntimeError:
+        status = self._write_status(exc)
+        if status == 404 and record_id is not None:
+            return RecordNotFoundError(f"{op} failed: record {record_id!r} not found: {exc}")
+        if status is not None and 400 <= status < 500 and status != 408:
+            return WriteRejectedError(f"{op} failed: {exc}")
+        if isinstance(exc, ConnectTimeout):
+            return self._as_runtime_error(exc, op)
+        return WriteOutcomeUnknownError(f"{op} failed: {exc}")
+
+
     def _normalize_field_value_for_write(self, value: Any) -> Any:
         """Normalize a field value for writing to Airtable.
 
@@ -349,7 +398,7 @@ class AirtableConnector(BaseConnector):
         try:
             created = self.table.create(fields)
         except Exception as exc:
-            raise self._as_runtime_error(exc, "create_one") from exc
+            raise self._as_write_error(exc, "create_one") from exc
 
         return self._normalize_record(created)
 
@@ -391,6 +440,7 @@ class AirtableConnector(BaseConnector):
 
         Raises:
             ValueError: If record_id is not a non-empty string or changes is not a non-empty dict.
+            RecordNotFoundError: If Airtable confirms that the target is missing.
         """
         if not isinstance(record_id, str) or not record_id.strip():
             raise ValueError("record_id must be a non-empty string")
@@ -410,12 +460,10 @@ class AirtableConnector(BaseConnector):
         try:
             updated = self.table.update(rid, fields)
         except Exception as exc:
-            if self._is_not_found_error(exc):
-                raise RuntimeError(f"update_one failed: record '{rid}' not found") from exc
-            raise self._as_runtime_error(exc, "update_one") from exc
+            raise self._as_write_error(exc, "update_one", rid) from exc
 
         if not updated:
-            raise RuntimeError(f"update_one failed: record '{rid}' not found")
+            raise WriteOutcomeUnknownError("update_one failed: empty Airtable response")
 
         return self._normalize_record(updated)
 
@@ -451,12 +499,10 @@ class AirtableConnector(BaseConnector):
         try:
             replaced = self.table.update(rid, fields, replace=True)
         except Exception as exc:
-            if self._is_not_found_error(exc):
-                raise RuntimeError(f"replace_one failed: record '{rid}' not found") from exc
-            raise self._as_runtime_error(exc, "replace_one") from exc
+            raise self._as_write_error(exc, "replace_one", rid) from exc
 
         if not replaced:
-            raise RuntimeError(f"replace_one failed: record '{rid}' not found")
+            raise WriteOutcomeUnknownError("replace_one failed: empty Airtable response")
 
         return self._normalize_record(replaced)
 
@@ -488,11 +534,11 @@ class AirtableConnector(BaseConnector):
         try:
             result = self.table.delete(rid)
         except Exception as exc:
-            if self._is_not_found_error(exc):
+            if self._delete_target_is_missing(exc, rid):
                 return False
-            raise self._as_runtime_error(exc, "delete_one") from exc
+            raise self._as_write_error(exc, "delete_one") from exc
 
-        return bool((result or {}).get("deleted", False))
+        return bool(result["deleted"])
     
 
     def _read_many_normalized(self, query_dsl: QueryDict, sort_dsl: SortSpec) -> list[dict[str, Any]]:

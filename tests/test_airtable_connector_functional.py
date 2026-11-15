@@ -4,7 +4,10 @@ from unittest.mock import MagicMock, patch
 
 from pyairtable.formulas import to_formula_str
 import pytest
+from requests import Response
+from requests.exceptions import HTTPError
 
+from aracnid_core import RecordNotFoundError
 from aracnid_airtable.connector import AirtableConnector
 
 
@@ -87,19 +90,13 @@ def test_read_many_with_query_builds_formula(connector_and_table: tuple[Airtable
     assert query == {"status": "active"}  # input not mutated
 
 
-def test_update_one_not_found_raises_runtimeerror(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
+def test_replace_one_not_found_raises_record_not_found(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
     connector, table = connector_and_table
-    table.update.side_effect = Exception("404 Client Error: Not Found")
+    response = Response()
+    response.status_code = 404
+    table.update.side_effect = HTTPError("Not Found", response=response)
 
-    with pytest.raises(RuntimeError, match="not found"):
-        connector.update_one("missing-id", {"status": "active"})
-
-
-def test_replace_one_not_found_raises_runtimeerror(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
-    connector, table = connector_and_table
-    table.update.side_effect = Exception("404 Client Error: Not Found")
-
-    with pytest.raises(RuntimeError, match="not found"):
+    with pytest.raises(RecordNotFoundError, match="not found"):
         connector.replace_one("missing-id", {"name": "beta"})
 
 
@@ -111,7 +108,9 @@ def test_delete_one_hard_false_raises_runtimeerror(connector_and_table: tuple[Ai
 
 def test_delete_one_not_found_returns_false(connector_and_table: tuple[AirtableConnector, MagicMock]) -> None:
     connector, table = connector_and_table
-    table.delete.side_effect = Exception("404 Client Error: Not Found")
+    response = Response()
+    response.status_code = 404
+    table.delete.side_effect = HTTPError("Not Found", response=response)
 
     out = connector.delete_one("missing-id", hard=True)
 
