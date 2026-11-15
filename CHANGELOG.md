@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project follows [Semantic Versioning](https://semver.org/).
 
+## [v1.7.0] - 2026-11-14
+
+### Changed
+
+- Bumped `aracnid-core` from `1.5.1` to `1.6.0`.
+- `update_one()` raises `RecordNotFoundError` for a confirmed missing record and creates nothing (D-074).
+- Single-record writes raise `WriteRejectedError` when Airtable confirms rejection and `WriteOutcomeUnknownError` when a dispatched write's effect cannot be confirmed. The connector preserves the original error and leaves replay after dispatch to the caller (D-075).
+
+### Fixed
+
+- `delete_one()` handles Airtable's ambiguous permission-or-missing response by querying the table for the exact record ID. It returns `False` if the query confirms the record is absent and preserves the original rejection if the record is present or the lookup fails.
+
+### Tests
+
+- Added offline coverage for missing-record updates, confirmed write rejections, lost responses after dispatch, and ambiguous delete responses.
+
 ## [v1.6.2] - 2026-08-06
 
 ### Fixed
